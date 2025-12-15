@@ -35,5 +35,5 @@ uv venv
 source .venv/bin/activate
 uv install
 # see scraping instructions below first..
-uv run uvicorn app.main:app
+uv run fastapi dev main.py
 ```
