@@ -1,0 +1,10 @@
+[project]
+name = "enterprise-knowledge-hub"
+version = "0.1.0"
+description = "Enterprise Knowledge hub to index the documents from various sources"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.124.4",
+    "pika>=1.3.2",
+]
