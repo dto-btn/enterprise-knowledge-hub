@@ -8,8 +8,7 @@ logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
-logging.getLogger("provider.queue.base").setLevel(logging.DEBUG)
-logging.getLogger("provider.queue.rabbitmq").setLevel(logging.DEBUG)
+
 logging.getLogger("router.knowledge.endpoints").setLevel(logging.DEBUG)
 
 logger = logging.getLogger(__name__)

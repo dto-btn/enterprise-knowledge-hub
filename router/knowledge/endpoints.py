@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from fastapi import BackgroundTasks
 
 from provider.queue.rabbitmq import RabbitMQProvider
+from services.knowledge.wikipedia import WikipediaKnowedgeService
 from services.queue.queue_service import QueueService
 
 load_dotenv()
@@ -16,14 +17,14 @@ router = APIRouter()
 KNOWLEDGE_BASE = "/knowledge"
 
 # initialize the queue service here
-queue_service = QueueService(RabbitMQProvider(url=os.getenv("RABBITMQ_URL")))
-wikipedia_service = KnowledgeService(WikipediaKnowedgeService(queue_service=queue_service, logger=logger))
+_queue_service = QueueService(queue_provider=RabbitMQProvider(url=os.getenv("RABBITMQ_URL"),
+                                                              logger=logger), logger=logger)
+_wikipedia_service = WikipediaKnowedgeService(queue_service=_queue_service, logger=logger)
 
 @router.get("/wikipedia/run")
 def wikipedia_run(background_tasks: BackgroundTasks):
     """Endpoint to trigger Wikipedia full run"""
-    logger.info("Starting Wikipedia ingestion run")
-    #background_tasks.add_task(_wikipedia_service.run)
+    background_tasks.add_task(_wikipedia_service.run)
     return {
         "message": "Wikipedia run started.",
         "details": f"Follow progress here {KNOWLEDGE_BASE}/wikipedia/status"
