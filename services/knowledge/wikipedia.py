@@ -1,5 +1,6 @@
 import bz2
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -11,7 +12,7 @@ from services.knowledge.base import KnowledgeService
 load_dotenv()
 
 DONE_SUFFIX: str = ".done"
-INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index\.txt\.bz2")
+INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index(?P<chunk>\d*)\.txt\.bz2")
 
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):
@@ -46,27 +47,32 @@ class WikipediaKnowedgeService(KnowledgeService):
             match = INDEX_FILENAME.match(index_path.name)
             if not match:
                 self.logger.warning("Skipping index file with unknown pattern: %s", index_path.name)
-                return None
+                continue
             #TODO: handle case where file wasn't fully processed before a abort/restart for instance
             self.logger.info("Reading data from Wikipedia source: %s", index_path)
             # Open up the index archive, and read line until you end up with a different byte offset (about 100 lines)
             # unzip the bites and for each articles (<page> items found in) send to the ingest queue
-            last_byteoffset: int | None = None
+            temp_last_byteoffset: int | None = None
             with bz2.open(index_path, mode='rt') as index_file:
                 for line in index_file:
                     try:
+                        last_byteoffset = temp_last_byteoffset
                         offset_str, _, _ = line.strip().split(":", 2)
                         offset = int(offset_str)
+                        # set the last byteoffset for the next iteration
+                        temp_last_byteoffset = offset
                         if last_byteoffset is None:
                             last_byteoffset = offset
                             lenght = offset
                         else:
                             lenght = offset - last_byteoffset
+
                         if last_byteoffset != offset:
                             # if the byteoffset is different here it means we hit a multistream chunk end,
                             # we need to extract it (or die trying), and yield the resulting individual <page> elements
                             prefix = match.group("prefix")
-                            dump_name = f"{prefix}.xml.bz2"
+                            chunk = match.group("chunk")
+                            dump_name = f"{prefix}{chunk if chunk else ""}.xml.bz2"
                             dump_path = index_path.with_name(dump_name)
                             with open(dump_path, 'rb') as dump_file:
                                 dump_file.seek(last_byteoffset)

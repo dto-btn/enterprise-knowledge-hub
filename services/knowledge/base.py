@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 import logging
 from services.queue.queue_service import QueueService
@@ -26,10 +27,8 @@ class KnowledgeService(ABC):
         """Ingest data into the knowledge base."""
         self.logger.info("Ingesting data into the knowledge base. (%s)", self.service_name)
         try:
-            items = self.read()
-            for item in items:
+            for item in self.read():
                 self.queue_service.write(self.service_name + ".ingest", item)
-                self.logger.debug("Ingested message: %s", item)
         except Exception as e:
             self.logger.exception("Error during ingestion for %s: %s", self.service_name, e)
         finally:
