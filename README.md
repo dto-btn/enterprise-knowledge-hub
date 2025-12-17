@@ -7,6 +7,10 @@ Make sure you add this file to the root: `.env` (refer to `.env.example`)
 
 To start the docker container: `docker compose up -d`
 
+### Files for KB implementation
+
+* Wikipedia; ensure you `mkdir wikipedia` within the `./content/` folder and drop your files there. 
+
 ### Database Setup
 
 ```bash

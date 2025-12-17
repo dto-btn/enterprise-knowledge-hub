@@ -1,4 +1,5 @@
-from abc import ABC
+from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass
 import logging
 from services.queue.queue_service import QueueService
@@ -16,11 +17,16 @@ class KnowledgeService(ABC):
         self.logger.info("Running knowledge ingestion for %s", self.service_name)
         self.ingest()
 
+    @abstractmethod
+    def read(self) -> Iterator[dict[str, object]]:
+        """Read data from a source that can be anything and will pass the message to the ingest queue."""
+        raise NotImplementedError("Subclasses must implement the read method.")
+
     def ingest(self) -> None:
         """Ingest data into the knowledge base."""
         self.logger.info("Ingesting data into the knowledge base. (%s)", self.service_name)
-        items = [{"data": "sample data 1"}, {"data": "sample data 2"}]
         try:
+            items = self.read()
             for item in items:
                 self.queue_service.write(self.service_name + ".ingest", item)
                 self.logger.debug("Ingested message: %s", item)
