@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 import logging
 from services.queue.queue_service import QueueService
@@ -11,12 +11,20 @@ class KnowledgeService(ABC):
     logger: logging.Logger
     service_name: str
 
-    @abstractmethod
     def run(self) -> None:
         """Run the knowledge ingestion process."""
-        raise NotImplementedError
+        self.logger.info("Running knowledge ingestion for %s", self.service_name)
+        self.ingest()
 
     def ingest(self) -> None:
         """Ingest data into the knowledge base."""
-        self.logger.info("Ingesting data into the knowledge base.")
-        ingest_queue = self.queue_service.get(self.service_name + "ingest_queue")
+        self.logger.info("Ingesting data into the knowledge base. (%s)", self.service_name)
+        items = [{"data": "sample data 1"}, {"data": "sample data 2"}]
+        try:
+            for item in items:
+                self.queue_service.write(self.service_name + ".ingest", item)
+                self.logger.debug("Ingested message: %s", item)
+        except Exception as e:
+            self.logger.exception("Error during ingestion for %s: %s", self.service_name, e)
+        finally:
+            self.logger.info("Done processing with ingestion for %s", self.service_name)

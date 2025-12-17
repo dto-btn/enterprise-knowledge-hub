@@ -16,6 +16,7 @@ class QueueProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    @contextmanager
     def read(self, queue_name: str) -> dict[str, object]:
         """Read from the specified queue."""
         raise NotImplementedError
