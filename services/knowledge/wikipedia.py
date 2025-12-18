@@ -194,6 +194,7 @@ class WikipediaKnowedgeService(KnowledgeService):
             return None
 
         return WikipediaItem(
+            name=title,
             title=title,
             content=content,
             last_modified_date=last_modified_date,
