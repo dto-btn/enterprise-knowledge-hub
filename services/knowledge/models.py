@@ -26,10 +26,16 @@ class WikipediaItem(KnowledgeItem):
 
     def to_dict(self) -> dict[str, object]:
         """Convert to dictionary for queue serialization."""
+        lmd = self.last_modified_date
+        if (hasattr(lmd, 'isoformat')):
+            formatted_date = lmd.isoformat()
+        else:
+            formatted_date = lmd
         return {
             "name": self.name,
             "title": self.title,
             "content": self.content,
-            "last_modified_date": self.last_modified_date.isoformat() if self.last_modified_date else None,
+            # "last_modified_date": self.last_modified_date.isoformat() if self.last_modified_date else None,
+            "last_modified_date": formatted_date,
             "pid": self.pid,
         }
