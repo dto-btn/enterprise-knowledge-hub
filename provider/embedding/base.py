@@ -1,7 +1,5 @@
-from contextlib import contextmanager
 import numpy as np
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import List
 
 class EmbeddingBackendProvider(ABC):
