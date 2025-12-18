@@ -30,7 +30,7 @@ class KnowledgeService(ABC):
         raise NotImplementedError("Subclasses must implement the read method.")
 
     @abstractmethod
-    def process_queue(self, knowledge_item: dict[str, object]) -> None:
+    def process_queue(self, **kwargs) -> None:
         """Process ingested data from the queue."""
         raise NotImplementedError("Subclasses must implement the process method.")
 
@@ -45,7 +45,8 @@ class KnowledgeService(ABC):
         finally:
             self.logger.info("Done processing with ingestion for %s", self.service_name)
 
-    def process(self) -> None:
+    @abstractmethod
+    def process(self, **kwargs) -> None:
         """Process ingested data."""
         self.logger.info("Processing ingested data. (%s)", self.service_name)
         # Placeholder for processing logic
