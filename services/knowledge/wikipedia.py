@@ -54,15 +54,25 @@ class WikipediaKnowedgeService(KnowledgeService):
             temp_last_byteoffset: int | None = None
             with bz2.open(index_path, mode='rt') as index_file:
                 for line in index_file:
+                    # Parse the offset first - we need it for both skipped and processed lines
                     try:
-                        last_byteoffset = temp_last_byteoffset
                         offset_str, _, _ = line.strip().split(":", 2)
                         offset = int(offset_str)
+                    except ValueError:
+                        self.logger.warning(
+                            "Skipping malformed line in %s", index_path.name
+                        )
+                        continue
 
-                        if line in completed_lines:
-                            # already processed this line, skip it
-                            continue
+                    if line in completed_lines:
+                        # already processed this line, update temp offset and skip
+                        temp_last_byteoffset = offset
+                        continue
 
+                    # From here, we are processing a new line
+                    line_processed = False
+                    try:
+                        last_byteoffset = temp_last_byteoffset
                         # set the last byteoffset for the next iteration
                         temp_last_byteoffset = offset
                         if last_byteoffset is None:
@@ -94,13 +104,14 @@ class WikipediaKnowedgeService(KnowledgeService):
                                         "Failed to decompress chunk from %s between offsets %s and %s: %s",
                                         dump_name, last_byteoffset, offset, exc
                                     )
-                    except ValueError:
-                        self.logger.warning(
-                            "Skipping malformed line in %s", index_path.name
-                        )
+                        line_processed = True
+                    except Exception as exc:
+                        self.logger.error("Error processing line in %s: %s", index_path.name, exc)
+                        line_processed = True  # Mark as processed even on error to avoid infinite retry
                     finally:
-                        # note this line as completed for this file, in case of restart later.
-                        self._mark_line_as_completed(index_path, line)
+                        # Only mark as completed if we actually attempted to process this line
+                        if line_processed:
+                            self._mark_line_as_completed(index_path, line)
 
     def _discover_index_files(self) -> Iterator[Path]:
         """
@@ -139,9 +150,9 @@ class WikipediaKnowedgeService(KnowledgeService):
         """
         Mark a line as completed by appending it to a .done file.
         """
-        done_path = index_path.with_suffix(index_path.suffix + DONE_SUFFIX)
-        with done_path.open('a') as done_file:
-            done_file.write(line)
+        # done_path = index_path.with_suffix(index_path.suffix + DONE_SUFFIX)
+        # with done_path.open('a') as done_file:
+        #     done_file.write(line)
 
     def _load_completed_lines(self, index_path: Path) -> set[str]:
         """
