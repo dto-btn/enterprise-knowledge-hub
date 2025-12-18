@@ -2,7 +2,7 @@ import gc
 import json
 import time
 from typing import Dict, Iterable, Tuple, Callable
-from llama_cpp import Llama
+# from llama_cpp import Llama
 from transformers import PreTrainedTokenizerBase, AutoTokenizer, AutoModel
 import os
 import torch
@@ -40,7 +40,7 @@ class EmbeddingUtil:
     #make this abstract?  the yield is wiki specific
     @staticmethod
     def article_to_chunks(article: Dict, tokenizer, max_tokens=512, overlap_tokens=64): 
-        chunks = EmbeddingUtil.chunk_text_by_tokens(article["xml_content"], tokenizer, max_tokens, overlap_tokens)
+        chunks = EmbeddingUtil.chunk_text_by_tokens(article["content"], tokenizer, max_tokens, overlap_tokens)
         for i, chunk_text in enumerate(chunks):
             yield {
                 "id": f'{article["page_id"]}-{i}',
@@ -153,109 +153,109 @@ class EmbeddingUtil:
         print(f"Max safe batch size = {low}")
         return low
     
-    def detect_max_batch_size_llamacpp(
-        model_path: str,
-        n_ctx: int,
-        n_gpu_layers: int,
-        n_threads: int | None = None,
-        pooling_type: int = 0,
-        # probe controls:
-        start_n_batch: int = 128,
-        max_n_batch_cap: int = 8192,
-        # microbatch: keep <= n_batch; often 256-1024 is a reasonable range to test
-        ubatch_policy: Callable[[int], int] = lambda nb: min(nb, 512),
-        # workload controls:
-        probe_texts_per_call: int = 8,
-        probe_text_chars: int = 6000,
-        normalize: bool = True,
-        warmup: bool = True,
-        verbose: bool = True,
-    ) -> Tuple[int, int]:
-        """
-        Returns (best_n_batch, best_n_ubatch)
+    # def detect_max_batch_size_llamacpp(
+    #     model_path: str,
+    #     n_ctx: int,
+    #     n_gpu_layers: int,
+    #     n_threads: int | None = None,
+    #     pooling_type: int = 0,
+    #     # probe controls:
+    #     start_n_batch: int = 128,
+    #     max_n_batch_cap: int = 8192,
+    #     # microbatch: keep <= n_batch; often 256-1024 is a reasonable range to test
+    #     ubatch_policy: Callable[[int], int] = lambda nb: min(nb, 512),
+    #     # workload controls:
+    #     probe_texts_per_call: int = 8,
+    #     probe_text_chars: int = 6000,
+    #     normalize: bool = True,
+    #     warmup: bool = True,
+    #     verbose: bool = True,
+    # ) -> Tuple[int, int]:
+    #     """
+    #     Returns (best_n_batch, best_n_ubatch)
 
-        This measures the maximum *token batch parameter* (n_batch) that works,
-        not "how many texts".
-        """
+    #     This measures the maximum *token batch parameter* (n_batch) that works,
+    #     not "how many texts".
+    #     """
 
-        dummy_text = "This is a dummy sentence for batch size testing."
-        probe_inputs = [dummy_text] * probe_texts_per_call
+    #     dummy_text = "This is a dummy sentence for batch size testing."
+    #     probe_inputs = [dummy_text] * probe_texts_per_call
 
-        def try_run(n_batch: int) -> bool:
-            n_ubatch = ubatch_policy(n_batch)
+    #     def try_run(n_batch: int) -> bool:
+    #         n_ubatch = ubatch_policy(n_batch)
 
-            try:
-                llm = Llama(
-                    model_path=model_path,
-                    embedding=True,              # required :contentReference[oaicite:6]{index=6}
-                    n_ctx=n_ctx,
-                    n_gpu_layers=n_gpu_layers,
-                    n_threads=n_threads,
-                    n_batch=n_batch,
-                    n_ubatch=n_ubatch,
-                    pooling_type=pooling_type,
-                    verbose=False,
-                )
+    #         try:
+    #             llm = Llama(
+    #                 model_path=model_path,
+    #                 embedding=True,              # required :contentReference[oaicite:6]{index=6}
+    #                 n_ctx=n_ctx,
+    #                 n_gpu_layers=n_gpu_layers,
+    #                 n_threads=n_threads,
+    #                 n_batch=n_batch,
+    #                 n_ubatch=n_ubatch,
+    #                 pooling_type=pooling_type,
+    #                 verbose=False,
+    #             )
 
-                if warmup:
-                    _ = llm.embed([probe_inputs[0]], normalize=normalize, truncate=True)
+    #             if warmup:
+    #                 _ = llm.embed([probe_inputs[0]], normalize=normalize, truncate=True)
 
-                _ = llm.embed(probe_inputs, normalize=normalize, truncate=True)
-                return True
+    #             _ = llm.embed(probe_inputs, normalize=normalize, truncate=True)
+    #             return True
 
-            except Exception as e:
-                if verbose:
-                    print(f"[FAIL] n_batch={n_batch}, n_ubatch={n_ubatch} -> {type(e).__name__}: {e}")
-                return False
+    #         except Exception as e:
+    #             if verbose:
+    #                 print(f"[FAIL] n_batch={n_batch}, n_ubatch={n_ubatch} -> {type(e).__name__}: {e}")
+    #             return False
 
-            finally:
-                # try to free native + python memory between probes
-                try:
-                    del llm
-                except UnboundLocalError:
-                    pass
-                gc.collect()
-                time.sleep(0.05)
+    #         finally:
+    #             # try to free native + python memory between probes
+    #             try:
+    #                 del llm
+    #             except UnboundLocalError:
+    #                 pass
+    #             gc.collect()
+    #             time.sleep(0.05)
 
-        # 1) Exponential search for upper bound
-        lo = start_n_batch
-        if not try_run(lo):
-            # If even the start fails, return something safe-ish
-            return 0, 0
+    #     # 1) Exponential search for upper bound
+    #     lo = start_n_batch
+    #     if not try_run(lo):
+    #         # If even the start fails, return something safe-ish
+    #         return 0, 0
 
-        hi = lo
-        while True:
-            next_hi = hi * 2
-            if next_hi > max_n_batch_cap:
-                next_hi = max_n_batch_cap
+    #     hi = lo
+    #     while True:
+    #         next_hi = hi * 2
+    #         if next_hi > max_n_batch_cap:
+    #             next_hi = max_n_batch_cap
 
-            if next_hi == hi:
-                break
+    #         if next_hi == hi:
+    #             break
 
-            if try_run(next_hi):
-                lo = next_hi
-                hi = next_hi
-                if hi >= max_n_batch_cap:
-                    break
-            else:
-                hi = next_hi
-                break
+    #         if try_run(next_hi):
+    #             lo = next_hi
+    #             hi = next_hi
+    #             if hi >= max_n_batch_cap:
+    #                 break
+    #         else:
+    #             hi = next_hi
+    #             break
 
-        # If we never found a failure, lo is our cap
-        if lo == max_n_batch_cap:
-            return lo, ubatch_policy(lo)
+    #     # If we never found a failure, lo is our cap
+    #     if lo == max_n_batch_cap:
+    #         return lo, ubatch_policy(lo)
 
-        # 2) Binary search between lo (pass) and hi (fail) to find max pass
-        left = lo
-        right = hi
-        best = lo
+    #     # 2) Binary search between lo (pass) and hi (fail) to find max pass
+    #     left = lo
+    #     right = hi
+    #     best = lo
 
-        while left + 1 < right:
-            mid = (left + right) // 2
-            if try_run(mid):
-                best = mid
-                left = mid
-            else:
-                right = mid
+    #     while left + 1 < right:
+    #         mid = (left + right) // 2
+    #         if try_run(mid):
+    #             best = mid
+    #             left = mid
+    #         else:
+    #             right = mid
 
-        return best, ubatch_policy(best)
+    #     return best, ubatch_policy(best)
