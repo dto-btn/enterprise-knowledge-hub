@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 import re
+import time
 
 from dotenv import load_dotenv
 from services.knowledge.base import KnowledgeService
@@ -44,6 +45,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         item: WikipediaItem = WikipediaItem(**knowledge_item)
         #self.logger.debug("Processing Wikipedia item: %s", item.title)
         # add vector logic here.
+        time.sleep(0.05)  # Simulate processing time
 
 
     def fetch_from_source(self) -> Iterator[WikipediaItem]:
