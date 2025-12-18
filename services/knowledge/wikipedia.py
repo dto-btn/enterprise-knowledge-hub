@@ -55,7 +55,19 @@ class WikipediaKnowedgeService(KnowledgeService):
         for index_path in self._discover_index_files():
             self.logger.info("Reading data from Wikipedia source: %s", index_path)
 
-            # Load last processed line number
+            # Derive dump path once
+            match = INDEX_FILENAME.match(index_path.name)
+            if not match:
+                continue
+            prefix = match.group("prefix")
+            chunk = match.group("chunk")
+            dump_name = f"{prefix}{chunk if chunk else ''}.xml.bz2"
+            dump_path = index_path.with_name(dump_name)
+
+            if not dump_path.exists():
+                self.logger.warning("Dump file not found: %s", dump_path)
+                continue
+
             start_line = self._load_progress(index_path)
             if start_line > 0:
                 self.logger.info("Resuming from line %d for %s", start_line, index_path.name)
@@ -63,7 +75,8 @@ class WikipediaKnowedgeService(KnowledgeService):
             temp_last_byteoffset: int | None = None
             current_line = 0
 
-            with bz2.open(index_path, mode='rt') as index_file:
+            # Open dump file ONCE for the entire index
+            with open(dump_path, 'rb') as dump_file, bz2.open(index_path, mode='rt') as index_file:
                 for line in index_file:
                     current_line += 1
 
@@ -92,29 +105,23 @@ class WikipediaKnowedgeService(KnowledgeService):
                             length = offset - last_byteoffset
 
                         if last_byteoffset != offset:
-                            match = INDEX_FILENAME.match(index_path.name)
-                            prefix = match.group("prefix")
-                            chunk = match.group("chunk")
-                            dump_name = f"{prefix}{chunk if chunk else ''}.xml.bz2"
-                            dump_path = index_path.with_name(dump_name)
-
-                            with open(dump_path, 'rb') as dump_file:
-                                dump_file.seek(last_byteoffset)
-                                data = dump_file.read(length)
-                                try:
-                                    decompressed = bz2.decompress(data)
-                                    xml_content = decompressed.decode("utf-8", errors="ignore")
-                                    for page_match in re.finditer(r"<page>(.*?)</page>", xml_content, re.DOTALL):
-                                        page_xml = page_match.group(0)
-                                        if not self._should_ignore_page(page_xml):
-                                            item = self._parse_page_xml(page_xml)
-                                            if item:
-                                                yield item
-                                except Exception as exc:
-                                    self.logger.error(
-                                        "Failed to decompress chunk from %s between offsets %s and %s: %s",
-                                        dump_name, last_byteoffset, offset, exc
-                                    )
+                            # Reuse the already-open file handle
+                            dump_file.seek(last_byteoffset)
+                            data = dump_file.read(length)
+                            try:
+                                decompressed = bz2.decompress(data)
+                                xml_content = decompressed.decode("utf-8", errors="ignore")
+                                for page_match in re.finditer(r"<page>(.*?)</page>", xml_content, re.DOTALL):
+                                    page_xml = page_match.group(0)
+                                    if not self._should_ignore_page(page_xml):
+                                        item = self._parse_page_xml(page_xml)
+                                        if item:
+                                            yield item
+                            except Exception as exc:
+                                self.logger.error(
+                                    "Failed to decompress chunk from %s between offsets %s and %s: %s",
+                                    dump_name, last_byteoffset, offset, exc
+                                )
                     except Exception as exc:
                         self.logger.error("Error processing line %d in %s: %s", current_line, index_path.name, exc)
                     finally:
