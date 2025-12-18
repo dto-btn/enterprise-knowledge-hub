@@ -25,7 +25,7 @@ class TorchEmbeddingBackend(EmbeddingBackendProvider):
     def setDevice(self, device: str):
         self.device = device        
 
-    def embed_torch(self, texts: List[str]) -> np.ndarray:
+    def embed(self, texts: List[str]) -> np.ndarray:
         
         #this means i'm retokenizing i think?  doing it twice.  
         #chunk token by text, tokenizes, then decodes back to text. 

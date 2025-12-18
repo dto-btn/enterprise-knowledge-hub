@@ -31,6 +31,9 @@ def _run_wikipedia_task():
     finally:
         _wikipedia_state.stop()
 
+def _run_wikipedia_vector():
+    print('running wiki function')
+    _wikipedia_service.process()
 
 @router.get("/wikipedia/run")
 def wikipedia_run(background_tasks: BackgroundTasks):
@@ -46,6 +49,12 @@ def wikipedia_run(background_tasks: BackgroundTasks):
         "message": "Wikipedia run started.",
         "details": f"Follow progress here {KNOWLEDGE_BASE}/wikipedia/status"
     }
+    
+@router.get("/wikipedia/vectorize")
+def wikipedia_vectorize():
+    print('running vecotr===========')
+    _run_wikipedia_vector()
+    
 
 
 @router.get("/wikipedia/status")
