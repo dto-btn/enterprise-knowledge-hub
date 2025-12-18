@@ -2,11 +2,17 @@ import bz2
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
+import json
 import os
 from pathlib import Path
 import re
+import threading
+import time
 
 from dotenv import load_dotenv
+from provider.embedding.base import EmbeddingBackendProvider
+from provider.embedding.embeddingUtil import EmbeddingUtil
+from provider.embedding.torch import TorchEmbeddingBackend
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import WikipediaItem
 
@@ -39,15 +45,110 @@ class WikipediaKnowedgeService(KnowledgeService):
     def __init__(self, queue_service, logger):
         super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
 
-    def process_queue(self, knowledge_item: dict[str, object]) -> None:
+    def process(
+        self, 
+        max_batch_size: int,
+        model: str,
+        isGGUF: bool,
+        device: str,
+        max_seq_length: int,
+        max_batch_cap: int,
+        overlap_tokens: int,
+        limit: int | None = None,
+        process_done_event: threading.Event | None = None,
+        idle_sleep: float | None = None
+    ) -> None:
+        
+        processed = 0
+        effective_limit = self._effective_limit(limit, self.process_limit)
+        input_queue = self.process_queue_name
+        start_time = time.perf_counter()
+        
+        #init backend.  in constructor?  check with sequence of events on where this needs to be init
+        backend = TorchEmbeddingBackend(model, device, max_seq_length)
+        
+        # get max batch size.  #random for now
+        # max_batch_size = 512 
+        max_batch_size = EmbeddingUtil.detect_max_batch_size(max_seq_length, device, max_batch_cap=max_batch_cap)
+        self.logger.info("Processing ingested data. (%s)", self.service_name)
+        # Placeholder for processing logic
+        try:
+            i = 0
+            print('try')
+            for batch in EmbeddingUtil.batched(self.process_queue(backend,
+                                                                  process_done_event,
+                                                                  idle_sleep,
+                                                                  overlap_tokens), max_batch_size):
+                print(i)
+                i = i + 1
+                if (i > 0):
+                    print('break')
+                    break
+            # elapsed = max(time.perf_counter() - start_time, 1e-6)
+            # rate = processed / elapsed
+            # self.logger.info(
+            #     "Vectorized %s items from %s (limit=%s, %.1f msg/s)",
+            #     processed,
+            #     input_queue,
+            #     effective_limit or "unbounded",
+            #     rate,
+            # )
+            # return processed
+            
+            
+            # item = self.queue_service.read(self.service_name + ".ingest")
+            # print('raw item')
+            # print(item)
+            # self.process_queue(item)
+        except:
+            print() #to fix
+            
+    def process_queue(
+        self, 
+        backend: EmbeddingBackendProvider,         
+        process_done_event: threading.Event | None = None,
+        idle_sleep: float | None = None,
+        overlap_tokens: int = 64
+    ):
         """Process ingested WikipediaItem from the queue."""
-        item: WikipediaItem = WikipediaItem(**knowledge_item)
+        
+        sleep_interval = self._normalize_idle_sleep(idle_sleep)
+        tokenizer = backend.tokenizer
+        max_tokens = backend.max_seq_len
+        
+        for item in self.queue_service.read(self.service_name + ".ingest"): #should change this read to a read without ackloeldge
+            try:
+                payload: WikipediaItem = WikipediaItem(**item)
+            except:
+                continue #to be added
+            try:
+                for chunk in EmbeddingUtil.article_to_chunks(payload, tokenizer, max_tokens, overlap_tokens):
+                    yield chunk
+            except:
+                continue #to be added
+            #acknoiledge
+            #increment stats
+                
+        
+
+        # payload = json.loads(item)
+        # print("item================")
+        # print(item)
+        # itemdict = item.to_dict()
+        # print('to_dict')
+        # print(itemdict)
+        # backend = TorchEmbeddingBackend(model_name="test", device="cpu")
+        # chunk = EmbeddingUtil.article_to_chunks(itemdict, backend.tokenizer)
+        # print("chunk")
+        # print(chunk)
+        
+            
         #self.logger.debug("Processing Wikipedia item: %s", item.title)
         # add vector logic here.
 
 
     def fetch_from_source(self) -> Iterator[WikipediaItem]:
-        """Read data from Wikipedia index.txt.bz2 source.
+        """Read data from Wikipedia index.txt.bz2 source.queue_service
 
             The content will be first entrypoint in the main .bz2 multistream file.
                 Ex: 345,6789,Fruits (Read more on the doc from the README.md from content/ folder)
