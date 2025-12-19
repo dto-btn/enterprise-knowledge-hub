@@ -36,6 +36,18 @@ class RabbitMQProvider(QueueProvider):
                 if method_frame is None:
                     break
                 yield json.loads(body.decode('utf-8'))
+    
+    def readNoAck(self, queue_name:str) -> Iterator[any]:
+        """Read all messages from the specified RabbitMQ queue."""
+        i = 0
+        with self.channel() as channel:
+            channel.queue_declare(queue=queue_name, durable=True)
+            while i < 1:
+                method_frame, header_frame, body = channel.basic_get(queue=queue_name, auto_ack=False)
+                i = i + 1
+                if method_frame is None:
+                    break
+                yield json.loads(body.decode('utf-8'))
 
     def write(self, queue_name: str, message: dict[str, object]) -> None:
         """Write to the specified RabbitMQ queue."""
