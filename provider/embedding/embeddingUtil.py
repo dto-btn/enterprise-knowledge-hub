@@ -19,6 +19,7 @@ class EmbeddingUtil:
             max_tokens: int = 512,
             overlap_tokens: int = 64,
         ):
+            print('chunk text')
             tokens = tokenizer.encode(text, add_special_tokens=False)
             chunks = []
             start = 0
@@ -40,14 +41,18 @@ class EmbeddingUtil:
     #make this abstract?  the yield is wiki specific
     @staticmethod
     def article_to_chunks(article: Dict, tokenizer, max_tokens=512, overlap_tokens=64): 
-        chunks = EmbeddingUtil.chunk_text_by_tokens(article["content"], tokenizer, max_tokens, overlap_tokens)
+        print('art to chunk==============')
+        print(article)
+        print("pid")
+        print(article.pid)
+        chunks = EmbeddingUtil.chunk_text_by_tokens(article.content, tokenizer, max_tokens, overlap_tokens)
         for i, chunk_text in enumerate(chunks):
             yield {
-                "id": f'{article["page_id"]}-{i}',
+                "id": f'{article.pid}-{i}',
                 "text": chunk_text,
                 "metadata": {
-                    "article_id": article["page_id"],
-                    "title": article.get("title"),
+                    "article_id": article.pid,
+                    "title": article.title,
                     "chunk_index": i,
                 },
             }
