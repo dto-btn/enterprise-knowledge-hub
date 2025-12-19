@@ -15,8 +15,8 @@ import time
 
 from dotenv import load_dotenv
 from provider.embedding.base import EmbeddingBackendProvider
-from provider.embedding.embeddingUtil import EmbeddingUtil
-from provider.embedding.torch import TorchEmbeddingBackend
+from provider.embedding.embedding_util import EmbeddingUtil
+from provider.embedding.torch_backend import TorchEmbeddingBackend
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import WikipediaItem
 

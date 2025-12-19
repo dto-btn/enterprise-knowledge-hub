@@ -39,14 +39,18 @@ class EmbeddingUtil:
         """
         Chunks articles
         """
-        chunks = EmbeddingUtil.chunk_text_by_tokens(article["xml_content"], tokenizer, max_tokens, overlap_tokens)
+        print('art to chunk==============')
+        print(article)
+        print("pid")
+        print(article.pid)
+        chunks = EmbeddingUtil.chunk_text_by_tokens(article.content, tokenizer, max_tokens, overlap_tokens)
         for i, chunk_text in enumerate(chunks):
             yield {
-                "id": f'{article["page_id"]}-{i}',
+                "id": f'{article.pid}-{i}',
                 "text": chunk_text,
                 "metadata": {
-                    "article_id": article["page_id"],
-                    "title": article.get("title"),
+                    "article_id": article.pid,
+                    "title": article.title,
                     "chunk_index": i,
                 },
             }
