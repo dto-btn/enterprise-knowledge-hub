@@ -1,7 +1,11 @@
+"""
+Main endpoints for knowledge management (creation/delete/update).
+"""
 import logging
 import os
+from typing import Literal
 from dotenv import load_dotenv
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi import BackgroundTasks
 
 from provider.queue.rabbitmq import RabbitMQProvider
@@ -49,9 +53,17 @@ def wikipedia_run(background_tasks: BackgroundTasks):
 
 
 @router.get("/wikipedia/status")
-def wikipedia_stats():
+def wikipedia_stats(
+    rate_window: Literal[5, 10] = Query(
+        default=5,
+        description="Time window in seconds for rate calculations (5 or 10)"
+    )
+):
     """Return in-memory ingestion stats plus live queue depths."""
+    # Update the rate window before getting stats
+    _wikipedia_service.stats.set_rate_window(rate_window)
+
     return {
         "running": _wikipedia_state.is_running(),
-        "stats": "empty #todo"
+        "stats": _wikipedia_service.stats.get_stats()
     }
