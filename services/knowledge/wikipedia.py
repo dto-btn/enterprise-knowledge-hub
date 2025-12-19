@@ -50,7 +50,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
 
     def process(
-        self, 
+        self,
         model: str = "test",
         device: str = "cpu",
         max_seq_length: int = 512,
@@ -60,19 +60,19 @@ class WikipediaKnowedgeService(KnowledgeService):
         process_done_event: threading.Event | None = None,
         idle_sleep: float | None = None
     ) -> None:
-        
+
         processed = 0
         # effective_limit = self._effective_limit(limit, self.process_limit)
         # input_queue = self.process_queue_name
         start_time = time.perf_counter()
-        
+
         print('init backend')
         #init backend.  in constructor?  check with sequence of events on where this needs to be init
         backend = TorchEmbeddingBackend(model, device, max_seq_length)
-        
+
         print('detect max batch')
         # get max batch size.  #random for now
-        max_batch_size = 512 
+        max_batch_size = 512
         # max_batch_size = EmbeddingUtil.detect_max_batch_size(max_seq_length, device, max_batch_cap=max_batch_cap)
         self.logger.info("Processing ingested data. (%s)", self.service_name)
         # Placeholder for processing logic
@@ -96,18 +96,18 @@ class WikipediaKnowedgeService(KnowledgeService):
             #     rate,
             # )
             # return processed
-            
-            
+
+
             # item = self.queue_service.read(self.service_name + ".ingest")
             # print('raw item')
             # print(item)
             # self.process_queue(item)
         except:
             print() #to fix
-            
+
     def process_queue(
-        self, 
-        backend: EmbeddingBackendProvider,         
+        self,
+        backend: EmbeddingBackendProvider,
         process_done_event: threading.Event | None = None,
         idle_sleep: float | None = None,
         overlap_tokens: int = 64
@@ -117,14 +117,15 @@ class WikipediaKnowedgeService(KnowledgeService):
         # sleep_interval = self._normalize_idle_sleep(idle_sleep)
         tokenizer = backend.tokenizer
         max_tokens = backend.max_seq_len
-        
-        for item in self.queue_service.read(self.service_name + ".ingest"): #should change this read to a read without ackloeldge
+
+        #should change this read to a read without ackloeldge
+        for item in self.queue_service.read(self.service_name + ".ingest"): 
             try:
                 payload: WikipediaItem = WikipediaItem(**item)
                 print(payload)
             except:
                 continue #to be added
-            
+
             try:
                 for chunk in EmbeddingUtil.article_to_chunks(payload, tokenizer, max_tokens, overlap_tokens):
                     print("chunk==========")
@@ -134,8 +135,8 @@ class WikipediaKnowedgeService(KnowledgeService):
                 continue #to be added
             #acknoiledge
             #increment stats
-                
-        
+
+
 
         # payload = json.loads(item)
         # print("item================")
@@ -147,8 +148,8 @@ class WikipediaKnowedgeService(KnowledgeService):
         # chunk = EmbeddingUtil.article_to_chunks(itemdict, backend.tokenizer)
         # print("chunk")
         # print(chunk)
-        
-            
+
+
         #self.logger.debug("Processing Wikipedia item: %s", item.title)
         # add vector logic here.
         time.sleep(0.05)  # Simulate processing time

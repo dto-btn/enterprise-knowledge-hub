@@ -53,12 +53,13 @@ def wikipedia_run(background_tasks: BackgroundTasks):
         "message": "Wikipedia run started.",
         "details": f"Follow progress here {KNOWLEDGE_BASE}/wikipedia/status"
     }
-    
+
 @router.get("/wikipedia/vectorize")
 def wikipedia_vectorize():
+    """Endpoint to trigger Wikipedia vectorize test"""
     print('running vecotr===========')
     _run_wikipedia_vector()
-    
+
 
 
 @router.get("/wikipedia/status")

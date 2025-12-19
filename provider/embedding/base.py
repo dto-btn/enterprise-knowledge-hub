@@ -12,7 +12,7 @@ class EmbeddingBackendProvider(ABC):
     model_name: str
     device: str
     max_seq_length: int
-    
+
     def set_device(self, device: str):
         """
         Set device type

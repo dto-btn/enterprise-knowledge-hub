@@ -27,7 +27,7 @@ class WikipediaItem(KnowledgeItem):
     def to_dict(self) -> dict[str, object]:
         """Convert to dictionary for queue serialization."""
         lmd = self.last_modified_date
-        if (hasattr(lmd, 'isoformat')):
+        if hasattr(lmd, 'isoformat'):
             formatted_date = lmd.isoformat()
         else:
             formatted_date = lmd

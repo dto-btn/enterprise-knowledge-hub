@@ -66,18 +66,25 @@ class RabbitMQProvider(QueueProvider):
                 self.logger.warning("Connection lost during read, reconnecting...")
                 channel = self._get_channel()
                 self._ensure_queue_declared(channel, queue_name)
-    
-    def readNoAck(self, queue_name:str) -> Iterator[any]:
+
+    def read_no_ack(self, queue_name:str) -> Iterator[any]:
         """Read all messages from the specified RabbitMQ queue."""
+        channel = self._get_channel()
+        self._ensure_queue_declared(channel, queue_name)
         i = 0
-        with self.channel() as channel:
-            channel.queue_declare(queue=queue_name, durable=True)
-            while i < 1:
-                method_frame, header_frame, body = channel.basic_get(queue=queue_name, auto_ack=False)
+
+        while i < 1:
+            try:
+                method_frame, _, body = channel.basic_get(queue=queue_name, auto_ack=False)
                 i = i + 1
                 if method_frame is None:
                     break
                 yield json.loads(body.decode('utf-8'))
+            except AMQPConnectionError:
+                # Reconnect and retry
+                self.logger.warning("Connection lost during read, reconnecting...")
+                channel = self._get_channel()
+                self._ensure_queue_declared(channel, queue_name)
 
     def write(self, queue_name: str, message: dict[str, object]) -> None:
         """Write to the specified RabbitMQ queue using persistent connection."""
