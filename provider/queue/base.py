@@ -1,4 +1,6 @@
-from contextlib import contextmanager
+"""
+Base class for queue providers.
+"""
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -10,13 +12,11 @@ class QueueProvider(ABC):
     logger: logging.Logger
 
     @abstractmethod
-    @contextmanager
-    def channel(self):
-        """Context manager for queue channel."""
+    def close(self):
+        """Close queue channel."""
         raise NotImplementedError
 
     @abstractmethod
-    @contextmanager
     def read(self, queue_name: str) -> dict[str, object]:
         """Read from the specified queue."""
         raise NotImplementedError
