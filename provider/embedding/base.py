@@ -12,7 +12,7 @@ class EmbeddingBackendProvider(ABC):
     model_name: str
     device: str
     max_seq_length: int
-
+    
     @abstractmethod
     def embed(self, text: List[str]) -> np.ndarray:
         """
