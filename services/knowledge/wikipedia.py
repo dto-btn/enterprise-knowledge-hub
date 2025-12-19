@@ -38,7 +38,7 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     _content_folder_path: Path = Path(os.getenv("WIKIPEDIA_CONTENT_FOLDER",
                                     "./content/wikipedia")).expanduser().resolve()
-
+    _process_only_first_n_paragraphs: int = int(os.getenv("WIKIPEDIA_PROCESS_ONLY_FIRST_N_PARAGRAPHS", "0"))
     _progress_flush_interval: int = 1000 # for the .progress file we track line number we stpped.
 
     def __init__(self, queue_service, logger):
@@ -56,7 +56,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         """Read data from Wikipedia index.txt.bz2 source.
 
             The content will be first entrypoint in the main .bz2 multistream file.
-                Ex: 345,6789,Fruits (Read more on the doc from the README.md from content/ folder)
+                Ex: 345:6789:Fruits (Read more on the doc from the README.md from content/ folder)
         """
         for index_path in self._discover_index_files():
             self.logger.info("Reading data from Wikipedia source: %s", index_path)
@@ -65,7 +65,11 @@ class WikipediaKnowedgeService(KnowledgeService):
             if dump_path is None:
                 continue
 
-            yield from self._process_index_file(index_path, dump_path)
+            try:
+                yield from self._process_index_file(index_path, dump_path)
+            except OSError as exc:
+                self.logger.error("Failed to process index file %s: %s. Continuing to next file.", index_path, exc)
+                continue
 
     def _get_dump_path(self, index_path: Path) -> Path | None:
         """Derive the dump file path from an index file path."""
@@ -174,12 +178,13 @@ class WikipediaKnowedgeService(KnowledgeService):
     def _discover_index_files(self) -> Iterator[Path]:
         """Discover index files in the content folder."""
         self.logger.debug("Searching for index files in ---> %s", self._content_folder_path)
-        for node in sorted(self._content_folder_path.rglob("*.txt*")):
+        for node in sorted(self._content_folder_path.rglob("*.txt.bz2")):
             if not node.is_file():
                 continue
             if node.suffix == PROGRESS_SUFFIX:
                 continue  # Skip progress files
-            match = INDEX_FILENAME.match(node.name)
+            # Use fullmatch to ensure entire filename matches (excludes :Zone.Identifier files)
+            match = INDEX_FILENAME.fullmatch(node.name)
             if not match:
                 self.logger.debug("Skipping index file with unknown pattern: %s", node.name)
                 continue
@@ -210,6 +215,12 @@ class WikipediaKnowedgeService(KnowledgeService):
         # Extract content (wiki markup text)
         text_match = re.search(r"<text[^>]*>([^<]*(?:<(?!/text>)[^<]*)*)</text>", xml_page, re.DOTALL)
         content = text_match.group(1) if text_match else ""
+
+        if self._process_only_first_n_paragraphs > 0:
+            # untested bit of code ... to be tweaked, online it says a line is needed for markdown to do a
+            # paragraph break, so just using \n for this ...
+            paragraphs = re.split(r'\n{2,}', content)
+            content = '\n\n'.join(paragraphs[:self._process_only_first_n_paragraphs])
 
         # Extract last modified date (timestamp)
         timestamp_match = re.search(r"<timestamp>([^<]+)</timestamp>", xml_page)
