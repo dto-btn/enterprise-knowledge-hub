@@ -27,8 +27,25 @@ class EmbeddingBackendProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def embed(self, text: List[str]) -> np.ndarray:
+    def embed(self, text: List[str], **kwargs) -> np.ndarray:
         """
         embedding abstract method
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def batched(self, **kwargs):
+        """
+        Docstring for batched
+
+        :param self: Description
+        :param kwargs: Description
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def detect_max_batch_size(self, **kwargs):
+        """
+        detects max batch size
         """
         raise NotImplementedError

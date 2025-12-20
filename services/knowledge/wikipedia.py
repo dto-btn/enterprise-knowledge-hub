@@ -59,27 +59,24 @@ class WikipediaKnowedgeService(KnowledgeService):
         idle_sleep: float | None = None
     ) -> None:
 
-        print('init backend')
-        #init backend.  in constructor?  check with sequence of events on where this needs to be init
         backend = self.embedding_service.embedding_provider
 
-        print('detect max batch')
+        
         # get max batch size.  #random for now
-        max_batch_size = 512
-        # max_batch_size = EmbeddingUtil.detect_max_batch_size(max_seq_length, device, max_batch_cap=max_batch_cap)
-        self.logger.info("Processing ingested data. (%s)", self.service_name)
+        # max_batch_size = 512
+        max_batch_size = backend.detect_max_batch_size()
+        
         # Placeholder for processing logic
         try:
-            for batch in EmbeddingUtil.batched(self.process_queue(backend,
+            for batch in backend.batched(self.process_queue(backend,
                                                                   process_done_event,
                                                                   idle_sleep,
                                                                   overlap_tokens), max_batch_size):
 
-                print('batch')
-                print(batch)
+                # batch creates      [{id: 1, content: , metadata: }, {id:2 , content: , metadata: }, {id:3 , content: , metadata: }]
+                # embedding creates  [{vectors for id 1}, {vectors for id 2}, {vectors for id 3}]
+                # upsert_batch takes embeddings and batch, zip(), then inserts each into db.
                 text = [chunk["content"] for chunk in batch]
-                print("************************************")
-                print(text)
                 embedding = backend.embed(text)
                 self.database_service.upsert_batch(embedding, batch)
                 

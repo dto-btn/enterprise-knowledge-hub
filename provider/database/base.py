@@ -5,7 +5,6 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Sequence, Iterable
-import numpy as np
 
 @dataclass(frozen=True)
 class VectorRecord:
@@ -14,12 +13,15 @@ class VectorRecord:
     embedding: Sequence[float]
     text: str
     metadata: dict
-    
+
 @dataclass
 class VectorDatabaseProvider(ABC):
     """
     Database Provider base
     """
+    logger: logging.Logger
+    
+    @abstractmethod
     def upsert(self, records: Iterable[VectorRecord], *, batch_size: int = 256) -> int:
         """Insert for database"""
         raise NotImplementedError
