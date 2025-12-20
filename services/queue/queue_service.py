@@ -17,3 +17,7 @@ class QueueService:
     def write(self, queue_name: str, message: dict[str, object]) -> None:
         """Write a message to the specified queue."""
         return self.queue_provider.write(queue_name, message)
+    
+    def read_no_ack(self, queue_name: str) -> Iterator[dict[str, object]]:
+        """Read messages from the specified queue."""
+        return self.queue_provider.read_no_ack(queue_name)
