@@ -1,7 +1,8 @@
 """
 Utility class
 """
-from typing import Dict, Iterable
+import os
+from typing import Dict, Iterable, Any
 from transformers import PreTrainedTokenizerBase, AutoTokenizer, AutoModel
 import torch
 
@@ -39,15 +40,11 @@ class EmbeddingUtil:
         """
         Chunks articles
         """
-        print('art to chunk==============')
-        print(article)
-        print("pid")
-        print(article.pid)
         chunks = EmbeddingUtil.chunk_text_by_tokens(article.content, tokenizer, max_tokens, overlap_tokens)
         for i, chunk_text in enumerate(chunks):
             yield {
                 "id": f'{article.pid}-{i}',
-                "text": chunk_text,
+                "content": chunk_text,
                 "metadata": {
                     "article_id": article.pid,
                     "title": article.title,
@@ -80,20 +77,21 @@ class EmbeddingUtil:
         """
         Embedding Provider base
         """
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModel.from_pretrained(model_name)
+        tokenizer:Any
+        model: Any
+        if device == "cuda":
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModel.from_pretrained(model_name)
+        elif device == "cpu":
+            # for testing lcoal
+            local_dir = os.path.expanduser("~/.cache/huggingface/hub/models--Qwen--Qwen3-Embedding-0.6B-GGUF/snapshots/370f27d7550e0def9b39c1f16d3fbaa13aa67728/")
+            tokenizer = AutoTokenizer.from_pretrained(local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf",
+                                                    local_files_only=True)
+            model = AutoModel.from_pretrained(local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf",local_files_only=True)
 
         # if default and device is cpu, then lower batch cap
         if max_batch_cap == 4096 and device == 'cpu':
             max_batch_cap = 1024
-
-        # for testing lcoal
-        # local_dir = os.path.expanduser("~/.cache/huggingface/hub/models--Qwen--Qwen3-Embedding-0.6B-GGUF/snapshots/
-        # 370f27d7550e0def9b39c1f16d3fbaa13aa67728/")
-        # tokenizer = AutoTokenizer.from_pretrained(local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf",
-        #                                           local_files_only=True)
-        # model = AutoModel.from_pretrained(local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf",
-        # local_files_only=True)
 
         model.to(device)
         model.eval()

@@ -1,10 +1,13 @@
 """
 Embedding Provider base
 """
+import logging
 from abc import ABC, abstractmethod
-from typing import List
+from dataclasses import dataclass
+from typing import List, Any
 import numpy as np
 
+@dataclass
 class EmbeddingBackendProvider(ABC):
     """
     Embedding Provider base
@@ -12,7 +15,11 @@ class EmbeddingBackendProvider(ABC):
     model_name: str
     device: str
     max_seq_length: int
+    tokenizer: Any
+    model: Any
+    logger: logging.Logger
 
+    @abstractmethod
     def set_device(self, device: str):
         """
         Set device type

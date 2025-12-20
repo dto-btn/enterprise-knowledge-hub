@@ -5,7 +5,7 @@ from transformers import AutoTokenizer, AutoModel
 from provider.embedding.base import EmbeddingBackendProvider
 
 
-class LlamaCPPEmbeddingBackend(EmbeddingBackendProvider):
+class LlamaCPPEmbeddingBackendProvider(EmbeddingBackendProvider):
     """
     Llama_CPP implementations for embedding backend.  GGUF files
     """
