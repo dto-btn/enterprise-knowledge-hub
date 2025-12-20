@@ -15,8 +15,7 @@ import time
 
 from dotenv import load_dotenv
 from provider.embedding.base import EmbeddingBackendProvider
-from provider.embedding.embedding_util import EmbeddingUtil
-from provider.embedding.torch_backend import TorchEmbeddingBackend
+from services.embedding.embedding_util import EmbeddingUtil
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import WikipediaItem
 
@@ -46,8 +45,8 @@ class WikipediaKnowedgeService(KnowledgeService):
     _process_only_first_n_paragraphs: int = int(os.getenv("WIKIPEDIA_PROCESS_ONLY_FIRST_N_PARAGRAPHS", "0"))
     _progress_flush_interval: int = 1000 # for the .progress file we track line number we stpped.
 
-    def __init__(self, queue_service, logger):
-        super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
+    def __init__(self, queue_service, embedding_service, database_service, logger):
+        super().__init__(queue_service=queue_service, embedding_service=embedding_service, database_service=database_service, logger=logger, service_name="wikipedia")
 
     def process(
         self,
@@ -56,19 +55,13 @@ class WikipediaKnowedgeService(KnowledgeService):
         max_seq_length: int = 512,
         max_batch_cap: int = 4096,
         overlap_tokens: int = 64,
-        limit: int | None = None,
         process_done_event: threading.Event | None = None,
         idle_sleep: float | None = None
     ) -> None:
 
-        processed = 0
-        # effective_limit = self._effective_limit(limit, self.process_limit)
-        # input_queue = self.process_queue_name
-        start_time = time.perf_counter()
-
         print('init backend')
         #init backend.  in constructor?  check with sequence of events on where this needs to be init
-        backend = TorchEmbeddingBackend(model, device, max_seq_length)
+        backend = self.embedding_service.embedding_provider
 
         print('detect max batch')
         # get max batch size.  #random for now
@@ -77,8 +70,6 @@ class WikipediaKnowedgeService(KnowledgeService):
         self.logger.info("Processing ingested data. (%s)", self.service_name)
         # Placeholder for processing logic
         try:
-            i = 0
-            print('try')
             for batch in EmbeddingUtil.batched(self.process_queue(backend,
                                                                   process_done_event,
                                                                   idle_sleep,
@@ -86,22 +77,13 @@ class WikipediaKnowedgeService(KnowledgeService):
 
                 print('batch')
                 print(batch)
-            # elapsed = max(time.perf_counter() - start_time, 1e-6)
-            # rate = processed / elapsed
-            # self.logger.info(
-            #     "Vectorized %s items from %s (limit=%s, %.1f msg/s)",
-            #     processed,
-            #     input_queue,
-            #     effective_limit or "unbounded",
-            #     rate,
-            # )
-            # return processed
-
-
-            # item = self.queue_service.read(self.service_name + ".ingest")
-            # print('raw item')
-            # print(item)
-            # self.process_queue(item)
+                text = [chunk["content"] for chunk in batch]
+                print("************************************")
+                print(text)
+                embedding = backend.embed(text)
+                self.database_service.upsert_batch(embedding, batch)
+                
+                
         except:
             print() #to fix
 
@@ -114,12 +96,11 @@ class WikipediaKnowedgeService(KnowledgeService):
     ):
         """Process ingested WikipediaItem from the queue."""
         print("process_queue")
-        # sleep_interval = self._normalize_idle_sleep(idle_sleep)
         tokenizer = backend.tokenizer
-        max_tokens = backend.max_seq_len
+        max_tokens = backend.max_seq_length
 
         #should change this read to a read without ackloeldge
-        for item in self.queue_service.read(self.service_name + ".ingest"): 
+        for item in self.queue_service.read_no_ack(self.service_name + ".ingest"): 
             try:
                 payload: WikipediaItem = WikipediaItem(**item)
                 print(payload)
@@ -135,25 +116,6 @@ class WikipediaKnowedgeService(KnowledgeService):
                 continue #to be added
             #acknoiledge
             #increment stats
-
-
-
-        # payload = json.loads(item)
-        # print("item================")
-        # print(item)
-        # itemdict = item.to_dict()
-        # print('to_dict')
-        # print(itemdict)
-        # backend = TorchEmbeddingBackend(model_name="test", device="cpu")
-        # chunk = EmbeddingUtil.article_to_chunks(itemdict, backend.tokenizer)
-        # print("chunk")
-        # print(chunk)
-
-
-        #self.logger.debug("Processing Wikipedia item: %s", item.title)
-        # add vector logic here.
-        time.sleep(0.05)  # Simulate processing time
-
 
     def fetch_from_source(self) -> Iterator[WikipediaItem]:
         """Read data from Wikipedia index.txt.bz2 source.queue_service

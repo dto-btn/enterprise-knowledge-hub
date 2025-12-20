@@ -8,12 +8,16 @@ import threading
 import time
 from services.knowledge.models import KnowledgeItem
 from services.queue.queue_service import QueueService
+from services.embedding.embedding_service import EmbeddingService
+from services.database.database_service import DatabaseService
 from services.stats.knowledge_service_stats import KnowledgeServiceStats
 
 @dataclass
 class KnowledgeService(ABC):
     """Abstract base class for knowledge services."""
     queue_service: QueueService
+    embedding_service: EmbeddingService
+    database_service: DatabaseService
     logger: logging.Logger
     service_name: str
     _producer_done: threading.Event = field(default_factory=threading.Event, init=False)
