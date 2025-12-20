@@ -13,7 +13,9 @@ from provider.embedding.base import EmbeddingBackendProvider
 
 @dataclass
 class LlamaCppEmbedder:
-
+    """
+    data class to hold values for llama embedder
+    """
     #tweak these values depending on model.
     # Eventually expose this so we can mod on the fly.
     model_path: str
@@ -43,11 +45,11 @@ class LlamaCPPEmbeddingBackendProvider(EmbeddingBackendProvider):
     """
     llama_embedder: LlamaCppEmbedder
     local_dir = os.path.expanduser("~/.cache/huggingface/hub/models--Qwen--Qwen3-Embedding-0.6B-GGUF/snapshots/370f27d7550e0def9b39c1f16d3fbaa13aa67728/")
-    def __init__(self, model_name: str, device: str = "cuda", max_seq_len: int = 512):
+    def __init__(self, model_name: str, logger, device: str = "cuda", max_seq_len: int = 512):
         self.model_name = model_name
         self.device = device
         self.max_seq_len = max_seq_len
-
+        self.llama_embedder = LlamaCppEmbedder(self.local_dir)
         #for testing purposes here
         # local_dir = os.path.expanduser(
             # "~/.cache/huggingface/hub/models--Qwen--Qwen3-Embedding-0.6B-GGUF/
@@ -57,12 +59,41 @@ class LlamaCPPEmbeddingBackendProvider(EmbeddingBackendProvider):
         # self.model = AutoModel.from_pretrained(local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf",
         # local_files_only=True).to(device)
 
+        if device == "cpu":
+            self.tokenizer = self.local_token()
+            self.model = self.local_model()
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            self.model = AutoModel.from_pretrained(model_name)
+
+        self.model.eval()
+        self.model.to(self.device)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(model_name).to(device)
 
         self.model.eval()
+        super().__init__(model_name, device, max_seq_len, self.tokenizer, self.model, logger)
 
-    def embed(self, text: List[str], normalize: bool = True) -> np.ndarray:
+    def local_token(self):
+        """
+        Docstring for local_token
+
+        :param self: Description
+        """
+        tokenizer = AutoTokenizer.from_pretrained(self.local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf",
+                                                local_files_only=True)
+        return tokenizer
+
+    def local_model(self):
+        """
+        Docstring for local_model
+
+        :param self: Description
+        """
+        model = AutoModel.from_pretrained(self.local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf",local_files_only=True)
+        return model
+
+    def embed(self, text: List[str], normalize: bool = True, **kwargs) -> np.ndarray:
         """
         Returns shape: (B,D) float32
         """
@@ -76,7 +107,8 @@ class LlamaCPPEmbeddingBackendProvider(EmbeddingBackendProvider):
                               prob_texts_per_call: int = 8,
                               ubatch_policy: Callable[[int], int] = lambda nb: min(nb, 512),
                               normalize: bool = True,
-                              warmup: bool = True):
+                              warmup: bool = True,
+                              **kwargs):
         probe_text = "This is a dummy sentence for batch size testing."
         probe_inputs = [probe_text] * prob_texts_per_call
 
@@ -152,14 +184,14 @@ class LlamaCPPEmbeddingBackendProvider(EmbeddingBackendProvider):
 
         return best, ubatch_policy(best)
 
-    def batched(self, text_iter, *, token_budget: int, token_counter, max_items: int | None = None):
+    def batched(self, iterable, token_budget: int, token_counter, max_items: int | None = None, **kwargs):
         """
         token_counter(text) -> int  (number of tokens for that text)
         """
         batch = []
         tokens = 0
 
-        for text in text_iter:
+        for text in iterable:
             t = token_counter(text)
 
             # if single item exceeds budget, still yield it alone (or truncate upstream)
@@ -173,4 +205,3 @@ class LlamaCPPEmbeddingBackendProvider(EmbeddingBackendProvider):
 
         if batch:
             yield batch
-

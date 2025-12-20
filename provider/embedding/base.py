@@ -20,13 +20,6 @@ class EmbeddingBackendProvider(ABC):
     logger: logging.Logger
 
     @abstractmethod
-    def set_device(self, device: str):
-        """
-        Set device type
-        """
-        raise NotImplementedError
-
-    @abstractmethod
     def embed(self, text: List[str], **kwargs) -> np.ndarray:
         """
         embedding abstract method

@@ -1,8 +1,8 @@
 """Embedding service to handle embedding operations."""
 from typing import List
-import numpy as np
 from dataclasses import dataclass
 import logging
+import numpy as np
 from provider.embedding.base import EmbeddingBackendProvider
 
 @dataclass

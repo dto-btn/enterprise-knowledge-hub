@@ -61,11 +61,11 @@ class WikipediaKnowedgeService(KnowledgeService):
 
         backend = self.embedding_service.embedding_provider
 
-        
+
         # get max batch size.  #random for now
         # max_batch_size = 512
         max_batch_size = backend.detect_max_batch_size()
-        
+
         # Placeholder for processing logic
         try:
             for batch in backend.batched(self.process_queue(backend,
@@ -79,8 +79,8 @@ class WikipediaKnowedgeService(KnowledgeService):
                 text = [chunk["content"] for chunk in batch]
                 embedding = backend.embed(text)
                 self.database_service.upsert_batch(embedding, batch)
-                
-                
+
+
         except:
             print() #to fix
 
@@ -97,7 +97,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         max_tokens = backend.max_seq_length
 
         #should change this read to a read without ackloeldge
-        for item in self.queue_service.read_no_ack(self.service_name + ".ingest"): 
+        for item in self.queue_service.read_no_ack(self.service_name + ".ingest"):
             try:
                 payload: WikipediaItem = WikipediaItem(**item)
                 print(payload)

@@ -32,7 +32,7 @@ _queue_service = QueueService(queue_provider=RabbitMQProvider(url=os.getenv("RAB
 _embedding_service = EmbeddingService(embedding_provider=TorchEmbeddingBackendProvider(model_name="Qwen3-Embedding-0.6B-Q8_0",
                                                                                logger=logger, device="cpu"),
                                       logger=logger)
-_database_service = DatabaseService(database_provider=PgVectorProvider(dsn=DSN), logger=logger)
+_database_service = DatabaseService(database_provider=PgVectorProvider(dsn=DSN, logger=logger), logger=logger)
 _wikipedia_service = WikipediaKnowedgeService(queue_service=_queue_service, embedding_service=_embedding_service,
                                               database_service=_database_service, logger=logger)
 _wikipedia_state = RunState()

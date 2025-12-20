@@ -20,7 +20,7 @@ class QueueProvider(ABC):
     def read(self, queue_name: str) -> dict[str, object]:
         """Read from the specified queue."""
         raise NotImplementedError
-    
+
     @abstractmethod
     def read_no_ack(self, queue_name: str) -> dict[str, object]:
         """Read from the specified queue without ack"""

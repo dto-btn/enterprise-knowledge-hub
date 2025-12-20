@@ -20,7 +20,7 @@ class VectorDatabaseProvider(ABC):
     Database Provider base
     """
     logger: logging.Logger
-    
+
     @abstractmethod
     def upsert(self, records: Iterable[VectorRecord], *, batch_size: int = 256) -> int:
         """Insert for database"""

@@ -2,7 +2,7 @@
 Torch implementations for embedding backend.  safetensors files
 """
 import os
-from typing import List, Iterable, Dict
+from typing import List
 import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModel
@@ -38,7 +38,7 @@ class TorchEmbeddingBackendProvider(EmbeddingBackendProvider):
             text,
             padding=True,
             truncation=True,
-            max_length=self.max_seq_len,
+            max_length=self.max_seq_length,
             return_tensors="pt",
         ).to(self.device)
 
@@ -150,7 +150,7 @@ class TorchEmbeddingBackendProvider(EmbeddingBackendProvider):
         print(f"Max safe batch size = {low}")
         return low
 
-    def batched(self, iterable: Iterable[Dict], batch_size: int):
+    def batched(self, iterable, batch_size: int):
         """
         Write meaningful stuff
         """
