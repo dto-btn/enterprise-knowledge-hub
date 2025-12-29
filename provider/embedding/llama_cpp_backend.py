@@ -1,7 +1,6 @@
 """
 Llama_CPP implementations for embedding backend.  GGUF files
 """
-from transformers import AutoTokenizer, AutoModel
 from provider.embedding.base import EmbeddingBackendProvider
 
 
@@ -10,10 +9,6 @@ class LlamaCPPEmbeddingBackend(EmbeddingBackendProvider):
     Llama_CPP implementations for embedding backend.  GGUF files
     """
     def __init__(self, model_name: str, device: str = "cuda", max_seq_len: int = 512):
-        self.model_name = model_name
-        self.device = device
-        self.max_seq_len = max_seq_len
-
         #for testing purposes here
         # local_dir = os.path.expanduser(
             # "~/.cache/huggingface/hub/models--Qwen--Qwen3-Embedding-0.6B-GGUF/
@@ -22,11 +17,7 @@ class LlamaCPPEmbeddingBackend(EmbeddingBackendProvider):
         # gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf", local_files_only=True)
         # self.model = AutoModel.from_pretrained(local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf",
         # local_files_only=True).to(device)
-
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModel.from_pretrained(model_name).to(device)
-
-        self.model.eval()
+        super().__init__(model_name=model_name, device=device, max_seq_len=max_seq_len)
 
     def set_device(self, device: str):
         """

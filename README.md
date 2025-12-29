@@ -41,3 +41,9 @@ uv sync
 # see how to populate your .content/<kbprovider> folder first in the README.md there
 uv run fastapi dev main.py
 ```
+
+Before commiting (no `git` *pre-hook* yet):
+
+```bash
+uv run pylint $(git ls-files '*.py') --rcfile=.vscode/pylintrc
+```
