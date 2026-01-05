@@ -3,15 +3,17 @@
     has vectorization processing logic at the process step. to a vector db
 """
 import bz2
+import os
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
-import os
 from pathlib import Path
-import re
-import time
 
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
+
+import torch
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import WikipediaItem
 
@@ -19,6 +21,19 @@ load_dotenv()
 
 PROGRESS_SUFFIX: str = ".progress"
 INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index(?P<chunk>\d*)\.txt\.bz2")
+
+
+# Load the model
+#model = SentenceTransformer("Qwen/Qwen3-Embedding-8B")
+#    model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto"},
+model = SentenceTransformer(
+    "Qwen/Qwen3-Embedding-8B",
+    model_kwargs={"device_map": "auto"},# use 16 on gpu, 32 on cpu (ai recommendation?)
+    tokenizer_kwargs={"padding_side": "left"},
+)
+
+if torch.cuda.is_available():
+    torch.cuda.empty_cache()
 
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):
@@ -46,10 +61,9 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def process_queue(self, knowledge_item: dict[str, object]) -> None:
         """Process ingested WikipediaItem from the queue."""
-        #item: WikipediaItem = WikipediaItem(**knowledge_item)
-        #self.logger.debug("Processing Wikipedia item: %s", item.title)
-        # add vector logic here.
-        time.sleep(0.05)  # Simulate processing time
+        item: WikipediaItem = WikipediaItem(**knowledge_item)
+        document_embeddings = model.encode(item.content)
+        self.logger.debug("Done processing Wikipedia item: %s", item.title)
 
 
     def fetch_from_source(self) -> Iterator[WikipediaItem]:
