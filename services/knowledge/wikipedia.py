@@ -65,7 +65,6 @@ class WikipediaKnowedgeService(KnowledgeService):
         try:
             item = WikipediaItem.from_dict(knowledge_item)
             document_embeddings = model.encode(item.content)
-            self.logger.debug("Done processing Wikipedia item: %s", item.title)
             return DatabaseWikipediaItem(
                 name=item.name,
                 title=item.title,

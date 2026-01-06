@@ -10,9 +10,13 @@ class QueueService:
     queue_provider: QueueProvider
     logger: logging.Logger
 
-    def read(self, queue_name: str) -> Iterator[dict[str, object]]:
+    def read(self, queue_name: str) -> Iterator[tuple[dict[str, object], int]]:
         """Read messages from the specified queue."""
         return self.queue_provider.read(queue_name)
+
+    def read_ack(self, delivery_tag: int, successful: bool = True) -> None:
+        """Acknowledge or negatively acknowledge a message from the specified queue."""
+        return self.queue_provider.read_ack(delivery_tag, successful)
 
     def write(self, queue_name: str, message: dict[str, object]) -> None:
         """Write a message to the specified queue."""

@@ -67,14 +67,14 @@ class KnowledgeService(ABC):
         try:
             while True:
                 # Drain all available messages
-                for item, channel in self.queue_service.read(queue_name):
+                for item, delivery_tag in self.queue_service.read(queue_name):
                     try:
                         self.process_queue(item)
                         self._stats.record_processed()
-                        channel.basic_ack(delivery_tag=item.get('delivery_tag', 0))
+                        self.queue_service.read_ack(delivery_tag, successful=True)
                     except Exception as e:
                         self.logger.exception("Error processing item in %s: %s", self.service_name, e)
-                        channel.basic_nack(delivery_tag=item.get('delivery_tag', 0), requeue=True)
+                        self.queue_service.read_ack(delivery_tag, successful=False)
                 # Queue is empty - check if we should exit or wait
                 if self._producer_done.is_set():
                     break  # Producer done and queue empty

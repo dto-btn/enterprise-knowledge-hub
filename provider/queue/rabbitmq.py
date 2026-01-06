@@ -50,7 +50,7 @@ class RabbitMQProvider(QueueProvider):
             declared.add(queue_name)
             self._local.declared_queues = declared
 
-    def read(self, queue_name: str) -> Iterator[(Any, BlockingChannel)]:
+    def read(self, queue_name: str) -> Iterator[(Any, int)]:
         """Read all messages from the specified RabbitMQ queue using persistent connection."""
         channel = self._get_channel()
         self._ensure_queue_declared(channel, queue_name)
@@ -66,6 +66,13 @@ class RabbitMQProvider(QueueProvider):
                 self.logger.warning("Connection lost during read, reconnecting...")
                 channel = self._get_channel()
                 self._ensure_queue_declared(channel, queue_name)
+
+    def read_ack(self, delivery_tag, successful: bool = True):
+        channel = self._get_channel()
+        if successful:
+            channel.basic_ack(delivery_tag=delivery_tag)
+        else:
+            channel.basic_nack(delivery_tag=delivery_tag, requeue=True)
 
     def write(self, queue_name: str, message: dict[str, object]) -> None:
         """Write to the specified RabbitMQ queue using persistent connection."""
