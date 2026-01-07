@@ -157,6 +157,15 @@ wheels = [
 ]
 
 [[package]]
+name = "diskcache"
+version = "5.6.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/21/1c1ffc1a039ddcc459db43cc108658f32c57d271d7289a2794e401d0fdb6/diskcache-5.6.3.tar.gz", hash = "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc", size = 67916, upload-time = "2023-08-31T06:12:00.316Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/27/4570e78fc0bf5ea0ca45eb1de3818a23787af9b390c0b0a0033a1b8236f9/diskcache-5.6.3-py3-none-any.whl", hash = "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19", size = 45550, upload-time = "2023-08-31T06:11:58.822Z" },
+]
+
+[[package]]
 name = "dnspython"
 version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -186,6 +195,7 @@ dependencies = [
     { name = "accelerate" },
     { name = "fastapi", extra = ["standard"] },
     { name = "langchain" },
+    { name = "llama-cpp-python" },
     { name = "pika" },
     { name = "sentence-transformers" },
     { name = "torch" },
@@ -202,6 +212,7 @@ requires-dist = [
     { name = "accelerate", specifier = ">=1.12.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.124.4" },
     { name = "langchain", specifier = ">=1.2.1" },
+    { name = "llama-cpp-python", specifier = ">=0.3.16" },
     { name = "pika", specifier = ">=1.3.2" },
     { name = "sentence-transformers", specifier = ">=5.2.0" },
     { name = "torch", specifier = ">=2.9.1" },
@@ -642,6 +653,18 @@ sdist = { url = "https://files.pythonhosted.org/packages/6f/a3/d36a9935fd1215e21
 wheels = [
     { url = "https://files.pythonhosted.org/packages/34/01/9a3f0ff60afcb30383ea9775e9f9a233c0127bad7c786d878f78b487bebb/langsmith-0.6.1-py3-none-any.whl", hash = "sha256:cad1f0a5cb8baf01490d2d90b7515d2cecc31648237bf070d2e6c0e7d58a2079", size = 282977, upload-time = "2026-01-06T20:15:36.579Z" },
 ]
+
+[[package]]
+name = "llama-cpp-python"
+version = "0.3.16"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "diskcache" },
+    { name = "jinja2" },
+    { name = "numpy" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e4/b4/c8cd17629ced0b9644a71d399a91145aedef109c0333443bef015e45b704/llama_cpp_python-0.3.16.tar.gz", hash = "sha256:34ed0f9bd9431af045bb63d9324ae620ad0536653740e9bb163a2e1fcb973be6", size = 50688636, upload-time = "2025-08-15T04:58:29.212Z" }
 
 [[package]]
 name = "markdown-it-py"

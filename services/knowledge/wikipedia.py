@@ -14,14 +14,15 @@ from dotenv import load_dotenv
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import DatabaseWikipediaItem, WikipediaItem
 from provider.embedding.qwen3.sentence_transformer import Qwen3SentenceTransformer
+from provider.embedding.qwen3.llama import Qwen3LlamaCpp
 
 load_dotenv()
 
 PROGRESS_SUFFIX: str = ".progress"
 INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index(?P<chunk>\d*)\.txt\.bz2")
 
-embedder = Qwen3SentenceTransformer()
-
+#embedder = Qwen3SentenceTransformer()
+embedder = Qwen3LlamaCpp()
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):
     """Knowledge service for Wikipedia ingestion."""
