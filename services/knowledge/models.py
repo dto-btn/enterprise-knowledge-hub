@@ -2,8 +2,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from torch import Tensor
+import numpy as np
 
 
 @dataclass
@@ -47,10 +49,4 @@ class WikipediaItem(KnowledgeItem):
 @dataclass
 class DatabaseWikipediaItem(WikipediaItem):
     """Knowledge item representing a Wikipedia page stored in a database."""
-    embeddings: Tensor | None = field(default=None)
-
-    def to_dict(self) -> dict[str, object]:
-        """Convert to dictionary for queue serialization."""
-        base_dict = super().to_dict()
-        base_dict.update({"embeddings": self.embeddings.__dict__ if self.embeddings is not None else None})
-        return base_dict
+    embeddings: np.ndarray | Tensor | None = field(default=None)

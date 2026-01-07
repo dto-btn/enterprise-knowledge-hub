@@ -11,49 +11,16 @@ from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer, AutoModel, BitsAndBytesConfig
-import torch
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import DatabaseWikipediaItem, WikipediaItem
-from provider.embedding.qwen3 import Qwen3Embedding
+from provider.embedding.qwen3.sentence_transformer import Qwen3SentenceTransformer
 
 load_dotenv()
 
 PROGRESS_SUFFIX: str = ".progress"
 INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index(?P<chunk>\d*)\.txt\.bz2")
 
-
-# Load the model
-#model = SentenceTransformer("Qwen/Qwen3-Embedding-8B")
-#    model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto"},
-
-model = SentenceTransformer(
-    "Qwen/Qwen3-Embedding-0.6B",
-    model_kwargs={"device_map": torch.device("mps") if torch.backends.mps.is_available() else "auto",
-                  "dtype": torch.float32 if torch.backends.mps.is_available() else torch.float16},
-    tokenizer_kwargs={"padding_side": "left"},
-)
-model.max_seq_length = int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_MAX_LENGTH", "4096"))
-print("Model loaded on device:", model.device)
-print("Model max sequence length:", model.max_seq_length)
-
-#quantization_config = BitsAndBytesConfig(load_in_8bit=True)
-# model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B',)
-#                                   #quantization_config=quantization_config,
-#                                   #attn_implementation="flash_attention_2",
-#                                   #torch_dtype=torch.float16).cuda()
-# model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B',).eval()
-#                                   #quantization_config=quantization_config,
-#                                   #attn_implementation="flash_attention_2",
-#                                   #torch_dtype=torch.float16).cuda()
-#model = Qwen3Embedding(use_fp16=False, model_max_length=4096) # Wrapper with encode method
-# model = Qwen3Embedding(use_cuda=torch.cuda.is_available(), use_fp16=False)
-
-# if torch.backends.mps.is_available():
-#     torch.mps.empty_cache()
-# elif torch.cuda.is_available():
-#     torch.cuda.empty_cache()
+embedder = Qwen3SentenceTransformer()
 
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):
@@ -85,17 +52,8 @@ class WikipediaKnowedgeService(KnowledgeService):
             item = WikipediaItem.from_dict(knowledge_item)
             self.logger.debug("Generating embeddings for %s", item.title)
 
-            # Encode all chunks. Returns tensor of shape [num_chunks, embedding_dim]
-            # embeddings = model.encode(
-            #     item.content, dim=32
-            # )
-            embeddings = model.encode(item.content, convert_to_tensor=False, show_progress_bar=True, batch_size=4)
-
-            # Aggressive cleanup for MPS
-            if torch.backends.mps.is_available():
-                torch.mps.empty_cache()
-            elif torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # embed
+            embeddings = embedder.embed(item.content)
 
             return DatabaseWikipediaItem(
                 name=item.name,
@@ -103,7 +61,7 @@ class WikipediaKnowedgeService(KnowledgeService):
                 content=item.content,
                 last_modified_date=item.last_modified_date,
                 pid=item.pid,
-                embeddings=embeddings
+                embeddings=embeddings,
             )
         except Exception as e:
             self.logger.error("Error processing embedding for Wikipedia item: %s", e)
