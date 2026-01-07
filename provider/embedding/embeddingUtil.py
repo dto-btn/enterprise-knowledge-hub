@@ -11,7 +11,7 @@ import math
 
 
 class EmbeddingUtil:
-  
+
     @staticmethod
     def chunk_text_by_tokens(
             text: str,
@@ -39,7 +39,7 @@ class EmbeddingUtil:
 
     #make this abstract?  the yield is wiki specific
     @staticmethod
-    def article_to_chunks(article: Dict, tokenizer, max_tokens=512, overlap_tokens=64): 
+    def article_to_chunks(article: Dict, tokenizer, max_tokens=512, overlap_tokens=64):
         chunks = EmbeddingUtil.chunk_text_by_tokens(article["xml_content"], tokenizer, max_tokens, overlap_tokens)
         for i, chunk_text in enumerate(chunks):
             yield {
@@ -51,7 +51,7 @@ class EmbeddingUtil:
                     "chunk_index": i,
                 },
             }
-                  
+
     @staticmethod
     def batched (iterable: Iterable[Dict], batch_size: int):
         batch = []
@@ -62,7 +62,7 @@ class EmbeddingUtil:
                 batch = []
         if batch:
             yield batch
-          
+
     @staticmethod
     def detect_max_batch_size_torch(
         # model_name: str,
@@ -73,16 +73,16 @@ class EmbeddingUtil:
     ):
         # tokenizer = AutoTokenizer.from_pretrained(model_name)
         # model = AutoModel.from_pretrained(model_name)
-        
+
         # if default and device is cpu, then lower batch cap
         if max_batch_cap == 4096 and device == 'cpu':
             max_batch_cap: 1024
-        
+
         #test
         local_dir = os.path.expanduser("~/.cache/huggingface/hub/models--Qwen--Qwen3-Embedding-0.6B-GGUF/snapshots/370f27d7550e0def9b39c1f16d3fbaa13aa67728/")
         tokenizer = AutoTokenizer.from_pretrained(local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf", local_files_only=True)
         model = AutoModel.from_pretrained(local_dir, gguf_file="Qwen3-Embedding-0.6B-Q8_0.gguf", local_files_only=True)
-        
+
         model.to(device)
         model.eval()
 
@@ -105,14 +105,14 @@ class EmbeddingUtil:
                     _ = model(**inputs)
 
                 #test logic
-                # if batch_size < 10: 
+                # if batch_size < 10:
                 #     return True
                 # else:
                 #     raise RuntimeError("out of memory")
             except RuntimeError as e:
                 print ('runtime======' + str(e).lower())
                 if "out of memory" in str(e).lower():
-                    
+
                     # Clear OOM state
                     print(f"OOM at batch_size={batch_size}")
                     # torch.cuda.empty_cache()
@@ -152,7 +152,7 @@ class EmbeddingUtil:
 
         print(f"Max safe batch size = {low}")
         return low
-    
+
     def detect_max_batch_size_llamacpp(
         model_path: str,
         n_ctx: int,

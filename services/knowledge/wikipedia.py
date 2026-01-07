@@ -34,9 +34,10 @@ model = SentenceTransformer(
                   "dtype": torch.float32 if torch.backends.mps.is_available() else torch.float16},
     tokenizer_kwargs={"padding_side": "left"},
 )
+model.max_seq_length = int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_MAX_LENGTH", "4096"))
 print("Model loaded on device:", model.device)
 print("Model max sequence length:", model.max_seq_length)
-#model.max_seq_length = int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_MAX_LENGTH", "4096"))
+
 #quantization_config = BitsAndBytesConfig(load_in_8bit=True)
 # model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B',)
 #                                   #quantization_config=quantization_config,
@@ -88,13 +89,13 @@ class WikipediaKnowedgeService(KnowledgeService):
             # embeddings = model.encode(
             #     item.content, dim=32
             # )
-            embeddings = model.encode(item.content, convert_to_tensor=False, show_progress_bar=True, batch_size=4096)
+            embeddings = model.encode(item.content, convert_to_tensor=False, show_progress_bar=True, batch_size=4)
 
             # Aggressive cleanup for MPS
-            # if torch.backends.mps.is_available():
-            #     torch.mps.empty_cache()
-            # elif torch.cuda.is_available():
-            #     torch.cuda.empty_cache()
+            if torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+            elif torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
             return DatabaseWikipediaItem(
                 name=item.name,
