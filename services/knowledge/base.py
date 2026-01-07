@@ -58,7 +58,7 @@ class KnowledgeService(ABC):
             self.logger.exception("Error during ingestion for %s: %s", self.service_name, e)
         finally:
             self._producer_done.set()  # Signal that producer is finished
-            self.logger.info("Done processing with ingestion for %s", self.service_name)
+            self.logger.info("Done ingestion for %s", self.service_name)
 
     def process(self) -> None:
         """Process ingested data. Keeps polling until producer is done and queue is empty."""
@@ -69,7 +69,7 @@ class KnowledgeService(ABC):
                 # Drain all available messages
                 for item, delivery_tag in self.queue_service.read(queue_name):
                     try:
-                        self.process_queue(item)
+                        item_with_embedding = self.process_queue(item)
                         self._stats.record_processed()
                         self.queue_service.read_ack(delivery_tag, successful=True)
                     except Exception as e:

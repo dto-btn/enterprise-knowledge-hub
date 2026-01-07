@@ -12,10 +12,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
-
+from transformers import AutoTokenizer, AutoModel, BitsAndBytesConfig
 import torch
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import DatabaseWikipediaItem, WikipediaItem
+from provider.embedding.qwen3 import Qwen3Embedding
 
 load_dotenv()
 
@@ -26,16 +27,32 @@ INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index(?P<chunk>\d*)\.txt\.bz2")
 # Load the model
 #model = SentenceTransformer("Qwen/Qwen3-Embedding-8B")
 #    model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto"},
-MODEL=os.getenv("WIKIPEDIA_EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B")
-MODEL_MAX_LENGHTH=int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_MAX_LENGTH", "32768"))
+
 model = SentenceTransformer(
-    MODEL,
-    model_kwargs={"attn_implementation": "flash_attention_2", "device_map": "auto"},# use 16 on gpu, 32 on cpu (ai recommendation?)
+    "Qwen/Qwen3-Embedding-0.6B",
+    model_kwargs={"device_map": torch.device("mps") if torch.backends.mps.is_available() else "auto",
+                  "dtype": torch.float32 if torch.backends.mps.is_available() else torch.float16},
     tokenizer_kwargs={"padding_side": "left"},
 )
-model.max_seq_length = MODEL_MAX_LENGHTH
-if torch.cuda.is_available():
-    torch.cuda.empty_cache()
+print("Model loaded on device:", model.device)
+print("Model max sequence length:", model.max_seq_length)
+#model.max_seq_length = int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_MAX_LENGTH", "4096"))
+#quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+# model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B',)
+#                                   #quantization_config=quantization_config,
+#                                   #attn_implementation="flash_attention_2",
+#                                   #torch_dtype=torch.float16).cuda()
+# model = AutoModel.from_pretrained('Qwen/Qwen3-Embedding-0.6B',).eval()
+#                                   #quantization_config=quantization_config,
+#                                   #attn_implementation="flash_attention_2",
+#                                   #torch_dtype=torch.float16).cuda()
+#model = Qwen3Embedding(use_fp16=False, model_max_length=4096) # Wrapper with encode method
+# model = Qwen3Embedding(use_cuda=torch.cuda.is_available(), use_fp16=False)
+
+# if torch.backends.mps.is_available():
+#     torch.mps.empty_cache()
+# elif torch.cuda.is_available():
+#     torch.cuda.empty_cache()
 
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):
@@ -68,17 +85,16 @@ class WikipediaKnowedgeService(KnowledgeService):
             self.logger.debug("Generating embeddings for %s", item.title)
 
             # Encode all chunks. Returns tensor of shape [num_chunks, embedding_dim]
-            embeddings = model.encode(
-                sentences=item.content,
-                batch_size=1, # Low batch size to prevent OOM
-                convert_to_tensor=True
-            )
+            # embeddings = model.encode(
+            #     item.content, dim=32
+            # )
+            embeddings = model.encode(item.content, convert_to_tensor=False, show_progress_bar=True, batch_size=4096)
 
             # Aggressive cleanup for MPS
-            if torch.backends.mps.is_available():
-                torch.mps.empty_cache()
-            elif torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # if torch.backends.mps.is_available():
+            #     torch.mps.empty_cache()
+            # elif torch.cuda.is_available():
+            #     torch.cuda.empty_cache()
 
             return DatabaseWikipediaItem(
                 name=item.name,
@@ -90,7 +106,7 @@ class WikipediaKnowedgeService(KnowledgeService):
             )
         except Exception as e:
             self.logger.error("Error processing embedding for Wikipedia item: %s", e)
-            return None
+            raise e
 
     def fetch_from_source(self) -> Iterator[WikipediaItem]:
         """Read data from Wikipedia index.txt.bz2 source.
