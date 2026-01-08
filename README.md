@@ -28,6 +28,10 @@ CREATE TABLE documents (
    embedding VECTOR(1024),
    CONSTRAINT uniquename UNIQUE (file_name)
 );
+
+-- Recommended ANN index for pgvector
+CREATE INDEX IF NOT EXISTS documents_embedding_idx
+   ON documents USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
 ```
 
 ### Running locally

@@ -89,4 +89,12 @@ class KnowledgeService(ABC):
         except Exception as e:
             self.logger.exception("Error during processing for %s: %s", self.service_name, e)
         finally:
+            try:
+                self.finalize_processing()
+            except Exception as e:
+                self.logger.exception("Error during finalize_processing for %s: %s", self.service_name, e)
             self.logger.info("Done processing ingested data. (%s)", self.service_name)
+
+    def finalize_processing(self) -> None:
+        """Optional hook called after processing loop ends."""
+        return

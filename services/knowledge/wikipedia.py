@@ -13,6 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import DatabaseWikipediaItem, KnowledgeItem, WikipediaItem
+from services.db.postgrespg import WikipediaDbRecord, WikipediaPgRepository
 
 load_dotenv()
 
@@ -45,9 +46,12 @@ class WikipediaKnowedgeService(KnowledgeService):
                                     "./content/wikipedia")).expanduser().resolve()
     _process_only_first_n_paragraphs: int = int(os.getenv("WIKIPEDIA_PROCESS_ONLY_FIRST_N_PARAGRAPHS", "0"))
     _progress_flush_interval: int = 1000 # for the .progress file we track line number we stpped.
+    _batch_size: int = int(os.getenv("WIKIPEDIA_DB_BATCH_SIZE", "500"))
 
-    def __init__(self, queue_service, logger):
+    def __init__(self, queue_service, logger, repository: WikipediaPgRepository | None = None):
         super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
+        self._repository = repository or WikipediaPgRepository.from_env()
+        self._pending: list[WikipediaDbRecord] = []
 
     def process_queue(self, knowledge_item: dict[str, object]) -> DatabaseWikipediaItem:
         """Process ingested WikipediaItem from the queue."""
@@ -108,10 +112,20 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def store_item(self, item: DatabaseWikipediaItem) -> None:
         """Store the processed knowledge item into the knowledge base."""
-        # Implementation depends on the specific database or storage system being used.
-        # This is a placeholder for actual storage logic.
-        self.logger.debug("Storing Wikipedia item: %s", item.title)
-        # Example: self.database.save(item)
+        record = WikipediaDbRecord.from_item(item)
+        self._pending.append(record)
+        if len(self._pending) >= self._batch_size:
+            self._flush_pending()
+
+    def finalize_processing(self) -> None:
+        self._flush_pending()
+
+    def _flush_pending(self) -> None:
+        if not self._pending:
+            return
+        self.logger.debug("Flushing %d wikipedia records to Postgres", len(self._pending))
+        self._repository.insert_many(self._pending)
+        self._pending.clear()
 
     def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]:
         """Process a single index file and yield WikipediaItems."""
