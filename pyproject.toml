@@ -30,10 +30,10 @@ dev = [
 # uv sync --upgrade --no-cache --reinstall-package llama-cpp-python
 
 # CPU only (default) - no extra args needed
-# extra-build-variables = {}
+extra-build-variables = {}
 
 # CUDA support (NVIDIA GPU)
-extra-build-variables = { llama-cpp-python = { CMAKE_ARGS = "-DGGML_CUDA=on -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc" } }
+# extra-build-variables = { llama-cpp-python = { CMAKE_ARGS = "-DGGML_CUDA=on -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc" } }
 
 # Metal support (Apple Silicon)
 # extra-build-variables = { llama-cpp-python = { CMAKE_ARGS = "-DGGML_METAL=on" } }
