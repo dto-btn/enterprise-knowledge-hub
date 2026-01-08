@@ -1,6 +1,7 @@
 """
 Base class for queue providers.
 """
+from collections.abc import Iterator
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -17,8 +18,13 @@ class QueueProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def read(self, queue_name: str) -> dict[str, object]:
+    def read(self, queue_name: str) -> Iterator[tuple[dict[str, object], int]]:
         """Read from the specified queue."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def read_ack(self, delivery_tag: int, successful: bool = True) -> None:
+        """Read and acknowledge from the specified queue."""
         raise NotImplementedError
 
     @abstractmethod

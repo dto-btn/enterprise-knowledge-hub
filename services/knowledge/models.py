@@ -3,6 +3,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from torch import Tensor
+import numpy as np
+
 
 @dataclass
 class KnowledgeItem(ABC):
@@ -23,6 +26,16 @@ class WikipediaItem(KnowledgeItem):
     content: str = field(default="")  # Wiki markup content
     last_modified_date: datetime | None = field(default=None)
     pid: int = field(default=0)  # Page ID
+    chunk_index: int = field(default=1)
+    chunk_count: int = field(default=1)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> "WikipediaItem":
+        """Create WikipediaItem from dictionary (queue deserialization)."""
+        data = data.copy()  # Don't mutate the input
+        if data.get("last_modified_date"):
+            data["last_modified_date"] = datetime.fromisoformat(data["last_modified_date"])
+        return cls(**data)
 
     def to_dict(self) -> dict[str, object]:
         """Convert to dictionary for queue serialization."""
@@ -32,4 +45,11 @@ class WikipediaItem(KnowledgeItem):
             "content": self.content,
             "last_modified_date": self.last_modified_date.isoformat() if self.last_modified_date else None,
             "pid": self.pid,
+            "chunk_index": self.chunk_index,
+            "chunk_count": self.chunk_count,
         }
+
+@dataclass
+class DatabaseWikipediaItem(WikipediaItem):
+    """Knowledge item representing a Wikipedia page stored in a database."""
+    embeddings: np.ndarray | Tensor | None = field(default=None)

@@ -23,11 +23,19 @@ On first run ensure you have this table created:
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE documents (
    id SERIAL PRIMARY KEY,
-   file_name TEXT NOT NULL,
+   pid INT,
+   name TEXT,
+   chunk_index INT,
+   title TEXT,
    content TEXT,
-   embedding VECTOR(1024),
-   CONSTRAINT uniquename UNIQUE (file_name)
+   last_modified_date DATE,
+   embedding VECTOR(512),
+   CONSTRAINT documents_pid_chunk_index_key UNIQUE (pid, chunk_index)
 );
+
+-- Recommended ANN index for pgvector
+CREATE INDEX IF NOT EXISTS documents_embedding_idx
+   ON documents USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
 ```
 
 ### Running locally
@@ -41,3 +49,7 @@ uv sync
 # see how to populate your .content/<kbprovider> folder first in the README.md there
 uv run fastapi dev main.py
 ```
+
+### CUDA Support
+
+https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=WSL-Ubuntu&target_version=2.0&target_type=deb_local

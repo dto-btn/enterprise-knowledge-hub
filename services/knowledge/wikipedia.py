@@ -3,23 +3,31 @@
     has vectorization processing logic at the process step. to a vector db
 """
 import bz2
+import os
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
-import os
 from pathlib import Path
-import re
-import time
+
+import numpy as np
 
 from dotenv import load_dotenv
 from services.knowledge.base import KnowledgeService
-from services.knowledge.models import WikipediaItem
+from services.knowledge.models import DatabaseWikipediaItem, WikipediaItem
+from services.db.postgrespg import WikipediaDbRecord, WikipediaPgRepository
 
 load_dotenv()
 
 PROGRESS_SUFFIX: str = ".progress"
 INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index(?P<chunk>\d*)\.txt\.bz2")
 
+if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_BACKEND", "LLAMA").upper() == "SENTENCE_TRANSFORMER":
+    from provider.embedding.qwen3.sentence_transformer import Qwen3SentenceTransformer
+    embedder = Qwen3SentenceTransformer()
+else:
+    from provider.embedding.qwen3.llama_embed import Qwen3LlamaCpp
+    embedder = Qwen3LlamaCpp()
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):
     """Knowledge service for Wikipedia ingestion."""
@@ -40,17 +48,57 @@ class WikipediaKnowedgeService(KnowledgeService):
                                     "./content/wikipedia")).expanduser().resolve()
     _process_only_first_n_paragraphs: int = int(os.getenv("WIKIPEDIA_PROCESS_ONLY_FIRST_N_PARAGRAPHS", "0"))
     _progress_flush_interval: int = 1000 # for the .progress file we track line number we stpped.
+    _batch_size: int = int(os.getenv("POSTGRES_BATCH_SIZE", "500"))
 
-    def __init__(self, queue_service, logger):
+    def __init__(self, queue_service, logger, repository: WikipediaPgRepository | None = None):
         super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
+        self._repository = repository or WikipediaPgRepository.from_env()
+        self._pending: list[WikipediaDbRecord] = []
 
-    def process_queue(self, knowledge_item: dict[str, object]) -> None:
-        """Process ingested WikipediaItem from the queue."""
-        #item: WikipediaItem = WikipediaItem(**knowledge_item)
-        #self.logger.debug("Processing Wikipedia item: %s", item.title)
-        # add vector logic here.
-        time.sleep(0.05)  # Simulate processing time
+    def process_queue(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
+        """Process ingested WikipediaItem from the queue and return one row per text chunk."""
+        try:
+            item = WikipediaItem.from_dict(knowledge_item)
+            self.logger.debug("Generating embeddings for %s", item.title)
 
+            max_tokens = getattr(embedder, "max_seq_length", None)
+            if max_tokens is None:
+                max_tokens = getattr(getattr(embedder, "model", None), "max_seq_length", None)
+
+            chunks = embedder.chunk_text_by_tokens(item.content, max_tokens=max_tokens)
+            embeddings = embedder.embed(item.content)
+
+            arr = np.asarray(embeddings)
+            if arr.ndim == 1:
+                arr = arr.reshape(1, -1)
+
+            num_chunks = arr.shape[0]
+            if num_chunks != len(chunks):
+                self.logger.warning("Chunk/text count mismatch: embeddings=%d, chunks=%d", num_chunks, len(chunks))
+                limit = min(num_chunks, len(chunks))
+                arr = arr[:limit]
+                chunks = chunks[:limit]
+                num_chunks = limit
+
+            results: list[DatabaseWikipediaItem] = []
+            for idx, (chunk_text, vec) in enumerate(zip(chunks, arr), start=1):
+                results.append(
+                    DatabaseWikipediaItem(
+                        name=item.name,
+                        title=f"{item.title} (chunk {idx}/{num_chunks})",
+                        content=chunk_text,
+                        last_modified_date=item.last_modified_date,
+                        pid=item.pid,
+                        chunk_index=idx,
+                        chunk_count=num_chunks,
+                        embeddings=vec,
+                    )
+                )
+
+            return results
+        except Exception as e:
+            self.logger.error("Error processing embedding for Wikipedia item: %s", e)
+            raise e
 
     def fetch_from_source(self) -> Iterator[WikipediaItem]:
         """Read data from Wikipedia index.txt.bz2 source.
@@ -87,6 +135,23 @@ class WikipediaKnowedgeService(KnowledgeService):
             return None
 
         return dump_path
+
+    def store_item(self, item: DatabaseWikipediaItem) -> None:
+        """Store the processed knowledge item into the knowledge base."""
+        record = WikipediaDbRecord.from_item(item)
+        self._pending.append(record)
+        if len(self._pending) >= self._batch_size:
+            self._flush_pending()
+
+    def finalize_processing(self) -> None:
+        self._flush_pending()
+
+    def _flush_pending(self) -> None:
+        if not self._pending:
+            return
+        self.logger.debug("Flushing %d wikipedia records to Postgres", len(self._pending))
+        self._repository.insert_many(self._pending)
+        self._pending.clear()
 
     def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]:
         """Process a single index file and yield WikipediaItems."""
