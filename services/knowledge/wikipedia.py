@@ -5,6 +5,7 @@
 import bz2
 import os
 import re
+import numpy as np
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from services.knowledge.base import KnowledgeService
-from services.knowledge.models import DatabaseWikipediaItem, KnowledgeItem, WikipediaItem
+from services.knowledge.models import DatabaseWikipediaItem, WikipediaItem
 from services.db.postgrespg import WikipediaDbRecord, WikipediaPgRepository
 
 load_dotenv()
@@ -46,30 +47,54 @@ class WikipediaKnowedgeService(KnowledgeService):
                                     "./content/wikipedia")).expanduser().resolve()
     _process_only_first_n_paragraphs: int = int(os.getenv("WIKIPEDIA_PROCESS_ONLY_FIRST_N_PARAGRAPHS", "0"))
     _progress_flush_interval: int = 1000 # for the .progress file we track line number we stpped.
-    _batch_size: int = int(os.getenv("WIKIPEDIA_DB_BATCH_SIZE", "500"))
+    _batch_size: int = int(os.getenv("POSTGRES_BATCH_SIZE", "500"))
 
     def __init__(self, queue_service, logger, repository: WikipediaPgRepository | None = None):
         super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
         self._repository = repository or WikipediaPgRepository.from_env()
         self._pending: list[WikipediaDbRecord] = []
 
-    def process_queue(self, knowledge_item: dict[str, object]) -> DatabaseWikipediaItem:
-        """Process ingested WikipediaItem from the queue."""
+    def process_queue(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
+        """Process ingested WikipediaItem from the queue and return one row per text chunk."""
         try:
             item = WikipediaItem.from_dict(knowledge_item)
             self.logger.debug("Generating embeddings for %s", item.title)
 
-            # embed
+            max_tokens = getattr(embedder, "max_seq_length", None)
+            if max_tokens is None:
+                max_tokens = getattr(getattr(embedder, "model", None), "max_seq_length", None)
+
+            chunks = embedder.chunk_text_by_tokens(item.content, max_tokens=max_tokens)
             embeddings = embedder.embed(item.content)
 
-            return DatabaseWikipediaItem(
-                name=item.name,
-                title=item.title,
-                content=item.content,
-                last_modified_date=item.last_modified_date,
-                pid=item.pid,
-                embeddings=embeddings,
-            )
+            arr = np.asarray(embeddings)
+            if arr.ndim == 1:
+                arr = arr.reshape(1, -1)
+
+            num_chunks = arr.shape[0]
+            if num_chunks != len(chunks):
+                self.logger.warning("Chunk/text count mismatch: embeddings=%d, chunks=%d", num_chunks, len(chunks))
+                limit = min(num_chunks, len(chunks))
+                arr = arr[:limit]
+                chunks = chunks[:limit]
+                num_chunks = limit
+
+            results: list[DatabaseWikipediaItem] = []
+            for idx, (chunk_text, vec) in enumerate(zip(chunks, arr), start=1):
+                results.append(
+                    DatabaseWikipediaItem(
+                        name=f"{item.name}-chunk-{idx}",
+                        title=f"{item.title} (chunk {idx}/{num_chunks})",
+                        content=chunk_text,
+                        last_modified_date=item.last_modified_date,
+                        pid=item.pid,
+                        chunk_index=idx,
+                        chunk_count=num_chunks,
+                        embeddings=vec,
+                    )
+                )
+
+            return results
         except Exception as e:
             self.logger.error("Error processing embedding for Wikipedia item: %s", e)
             raise e

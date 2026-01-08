@@ -23,10 +23,15 @@ On first run ensure you have this table created:
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE documents (
    id SERIAL PRIMARY KEY,
+   pid INT,
+   name TEXT,
+   chunk_index INT,
+   title TEXT,
    file_name TEXT NOT NULL,
    content TEXT,
-   embedding VECTOR(1024),
-   CONSTRAINT uniquename UNIQUE (file_name)
+   last_modified_date DATE,
+   embedding VECTOR(512),
+   CONSTRAINT documents_pid_chunk_index_key UNIQUE (pid, chunk_index)
 );
 
 -- Recommended ANN index for pgvector

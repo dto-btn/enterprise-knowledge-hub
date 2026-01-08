@@ -27,6 +27,8 @@ class WikipediaItem(KnowledgeItem):
     content: str = field(default="")  # Wiki markup content
     last_modified_date: datetime | None = field(default=None)
     pid: int = field(default=0)  # Page ID
+    chunk_index: int = field(default=1)
+    chunk_count: int = field(default=1)
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "WikipediaItem":
@@ -44,6 +46,8 @@ class WikipediaItem(KnowledgeItem):
             "content": self.content,
             "last_modified_date": self.last_modified_date.isoformat() if self.last_modified_date else None,
             "pid": self.pid,
+            "chunk_index": self.chunk_index,
+            "chunk_count": self.chunk_count,
         }
 
 @dataclass

@@ -43,8 +43,8 @@ class KnowledgeService(ABC):
         raise NotImplementedError("Subclasses must implement the read method.")
 
     @abstractmethod
-    def process_queue(self, knowledge_item: dict[str, object]) -> None:
-        """Process ingested data from the queue."""
+    def process_queue(self, knowledge_item: dict[str, object]):
+        """Process ingested data from the queue. May return a single item or a list of items."""
         raise NotImplementedError("Subclasses must implement the process method.")
 
     @abstractmethod
@@ -74,9 +74,11 @@ class KnowledgeService(ABC):
                 # Drain all available messages
                 for item, delivery_tag in self.queue_service.read(queue_name):
                     try:
-                        item_with_embedding = self.process_queue(item)
-                        self.store_item(item_with_embedding)
-                        self._stats.record_processed()
+                        processed = self.process_queue(item)
+                        items = processed if isinstance(processed, list) else [processed]
+                        for item_with_embedding in items:
+                            self.store_item(item_with_embedding)
+                            self._stats.record_processed()
                         self.queue_service.read_ack(delivery_tag, successful=True)
                     except Exception as e:
                         self.logger.exception("Error processing item in %s: %s", self.service_name, e)
