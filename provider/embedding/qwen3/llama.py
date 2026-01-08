@@ -13,7 +13,7 @@ load_dotenv()
 
 class Qwen3LlamaCpp(EmbeddingBackendProvider):
     """
-    Qwen3 Sentence Transformer embedding provider.
+    Qwen3 Llama CPP embedding provider.
     """
     def __init__(self):
         self.max_seq_length = int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_MAX_LENGTH", "4096"))
@@ -31,16 +31,13 @@ class Qwen3LlamaCpp(EmbeddingBackendProvider):
         self.logger.debug("Split into %d chunks", len(chunks))
 
         # Encode the string chunks (llama-cpp takes raw text, not tensors)
-        raw_embeddings = self.model.embed(
-            chunks if len(chunks) > 1 else chunks[0],
-            truncate=True,
-        )
+        raw_embeddings = self.model.create_embedding(chunks)
 
         # Standardize shape: always return 2D array [num_chunks, dim]
-        if raw_embeddings and isinstance(raw_embeddings[0], (list, tuple)):
-            embeddings = np.asarray(raw_embeddings, dtype=np.float32)
-        else:
-            embeddings = np.asarray([raw_embeddings], dtype=np.float32)
+        # if raw_embeddings and isinstance(raw_embeddings[0], (list, tuple)):
+        #     embeddings = np.asarray(raw_embeddings, dtype=np.float32)
+        # else:
+        #     embeddings = np.asarray([raw_embeddings], dtype=np.float32)
 
         # Aggressive cleanup for MPS
         if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_CLEANUP", "False").lower() == "true":
@@ -49,7 +46,7 @@ class Qwen3LlamaCpp(EmbeddingBackendProvider):
             elif torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        return embeddings
+        return raw_embeddings
 
     def chunk_text_by_tokens(self, text: str, max_tokens: int = None, overlap_tokens: int = 200) -> list[str]:
         """Split text into chunks based on token count with overlap."""
