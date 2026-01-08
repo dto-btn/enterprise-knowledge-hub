@@ -23,7 +23,7 @@ if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_BACKEND", "LLAMA").upper() == "SENTENCE_
     from provider.embedding.qwen3.sentence_transformer import Qwen3SentenceTransformer
     embedder = Qwen3SentenceTransformer()
 else:
-    from provider.embedding.qwen3.llama import Qwen3LlamaCpp
+    from provider.embedding.qwen3.llama_embed import Qwen3LlamaCpp
     embedder = Qwen3LlamaCpp()
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):

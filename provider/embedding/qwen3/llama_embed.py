@@ -22,6 +22,8 @@ class Qwen3LlamaCpp(EmbeddingBackendProvider):
             filename="Qwen3-Embedding-0.6B-Q8_0.gguf",
             embedding=True,
             n_ctx=self.max_seq_length,
+            n_batch=self.max_seq_length,  # Set batch size equal to context for embeddings
+            pooling_type=1,  # 1 = LLAMA_POOLING_TYPE_MEAN (mean pooling)
         )
         self.logger = logging.getLogger(__name__)
         self.logger.debug("Model max sequence length: %d", self.max_seq_length)
@@ -30,23 +32,23 @@ class Qwen3LlamaCpp(EmbeddingBackendProvider):
         chunks = self.chunk_text_by_tokens(sentences, max_tokens=self.max_seq_length)
         self.logger.debug("Split into %d chunks", len(chunks))
 
-        # Encode the string chunks (llama-cpp takes raw text, not tensors)
-        raw_embeddings = self.model.create_embedding(chunks)
+        # Encode the string chunks
+        raw_embeddings = self.model.embed(chunks)
 
         # Standardize shape: always return 2D array [num_chunks, dim]
-        # if raw_embeddings and isinstance(raw_embeddings[0], (list, tuple)):
-        #     embeddings = np.asarray(raw_embeddings, dtype=np.float32)
-        # else:
-        #     embeddings = np.asarray([raw_embeddings], dtype=np.float32)
+        embeddings = raw_embeddings if isinstance(raw_embeddings, np.ndarray) else np.asarray(raw_embeddings, dtype=np.float32)
+        if embeddings.ndim == 1:
+            embeddings = embeddings.reshape(1, -1)
 
         # Aggressive cleanup for MPS
         if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_CLEANUP", "False").lower() == "true":
+            self.logger.debug("Performing aggressive cleanup of model resources")
             if torch.backends.mps.is_available():
                 torch.mps.empty_cache()
             elif torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        return raw_embeddings
+        return embeddings
 
     def chunk_text_by_tokens(self, text: str, max_tokens: int = None, overlap_tokens: int = 200) -> list[str]:
         """Split text into chunks based on token count with overlap."""

@@ -42,6 +42,7 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
 
         # Aggressive cleanup for MPS
         if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_CLEANUP", "False").lower() == "true":
+            self.logger.debug("Performing aggressive cleanup of model resources")
             if torch.backends.mps.is_available():
                 torch.mps.empty_cache()
             elif torch.cuda.is_available():
