@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 import torch
+import torch.cuda
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
@@ -16,11 +17,17 @@ load_dotenv()
 class Qwen3SentenceTransformer(EmbeddingBackendProvider):
     """Qwen3 Sentence Transformer embedding provider."""
     def __init__(self):
+        if torch.cuda.is_available():
+            torch.cuda.set_per_process_memory_fraction(float(os.getenv("PYTORCH_CUDA_GPU_CAP", "0.8")))
+        # Reduce allocator chunk size to limit 4 GB blocks
+        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128,garbage_collection_threshold:0.6,expandable_segments:False")
+
         self.model = SentenceTransformer(
             "Qwen/Qwen3-Embedding-0.6B",
             model_kwargs={
                 "device_map": torch.device("mps") if torch.backends.mps.is_available() else "auto",
                 "dtype": torch.float32 if torch.backends.mps.is_available() else torch.float16,
+                "attn_implementation": "flash_attention_2" if torch.cuda.is_available() else "",
             },
             tokenizer_kwargs={"padding_side": "left"},
         )
