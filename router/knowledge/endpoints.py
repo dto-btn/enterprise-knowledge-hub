@@ -67,5 +67,3 @@ def wikipedia_stats(
         "running": _wikipedia_state.is_running(),
         "stats": _wikipedia_service.stats.get_stats()
     }
-
-@router.get("/search")

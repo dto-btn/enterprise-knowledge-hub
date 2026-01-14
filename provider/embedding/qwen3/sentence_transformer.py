@@ -40,6 +40,7 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
             model_kwargs={
                 "device_map": model_device,
                 "dtype": dtype,
+                # If connecting to DB locally and running, comment out the following line
                 "attn_implementation": "flash_attention_2" if torch.cuda.is_available() else "",
             },
             tokenizer_kwargs={"padding_side": "left"},
