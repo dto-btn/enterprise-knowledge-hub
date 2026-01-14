@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Query
-from services.knowledge.models import WikipediaItem
+from fastapi import APIRouter
+
+from services.db.model import DocumentRecord
 from services.knowledge.query import QueryService
 
 
@@ -13,8 +14,10 @@ router = APIRouter()
 
 _query_service = QueryService()
 
-@router.get("/test")
+@router.get("/test/{title}")
 def retrieve_wiki_articles(
-):
+    title:str
+) -> list[DocumentRecord]:
+    """Get wiki article content"""
     print("hit test endpoint success")
-    _query_service.test()
+    return _query_service.get_article_content_by_title(title)
