@@ -55,6 +55,15 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if attn_impl:
             model_kwargs["attn_implementation"] = attn_impl
 
+        # Use flash_attention_2 only if flash-attn package is installed and CUDA is available
+        attn_impl = "flash_attention_2" if _is_flash_attn_available() else None
+        model_kwargs = {
+            "device_map": model_device,
+            "dtype": dtype,
+        }
+        if attn_impl:
+            model_kwargs["attn_implementation"] = attn_impl
+
         self.model = SentenceTransformer(
             "Qwen/Qwen3-Embedding-0.6B",
             model_kwargs=model_kwargs,

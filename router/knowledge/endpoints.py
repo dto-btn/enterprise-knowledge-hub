@@ -55,7 +55,7 @@ def wikipedia_run(background_tasks: BackgroundTasks):
 @router.get("/wikipedia/status")
 def wikipedia_stats(
     rate_window: Literal[5, 10] = Query(
-        default=5,
+        default=10,
         description="Time window in seconds for rate calculations (5 or 10)"
     )
 ):

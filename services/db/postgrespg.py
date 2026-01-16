@@ -9,10 +9,12 @@ from typing import Sequence
 import numpy as np
 from dotenv import load_dotenv
 from pgvector.psycopg import register_vector
+from psycopg.rows import dict_row
 from psycopg import sql
 from psycopg_pool import ConnectionPool
 from torch import Tensor
 
+from services.db.model import DocumentRecord
 from services.knowledge.models import DatabaseWikipediaItem
 
 load_dotenv()
@@ -93,20 +95,27 @@ class WikipediaPgRepository:
     def from_env(cls) -> "WikipediaPgRepository":
         """
         Docstring for from_env
-        
+
+
         :param cls: Description
         :return: Description
         :rtype: WikipediaPgRepository
         """
+
+        #  (If running local connected to DB use 172.16.123.217 instead of localhost)
         host = os.getenv("POSTGRES_HOST", "localhost")
         port = int(os.getenv("POSTGRES_PORT", "5432"))
         dbname = os.getenv("POSTGRES_DB", "postgres")
         user = os.getenv("POSTGRES_USER", "postgres")
+        # For running local connected to DB use "postconninfotgres" instead
         password = os.getenv("POSTGRES_PASSWORD", "postgres")
         table_name = os.getenv("WIKIPEDIA_TABLE", "documents")
         pool_size = int(os.getenv("POSTGRES_POOL_SIZE", "5"))
         batch_size = int(os.getenv("POSTGRES_BATCH_SIZE", "500"))
         conninfo = f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
+        # print('==================conn info')
+        # print(conninfo)
+
         return cls(conninfo=conninfo, table_name=table_name, pool_size=pool_size, batch_size=batch_size)
 
     def insert_many(self, rows: Sequence[WikipediaDbRecord]) -> None:
@@ -133,6 +142,41 @@ class WikipediaPgRepository:
                 batch = params[i : i + self._batch_size]
                 cur.executemany(insert_sql.as_string(conn), batch)
             conn.commit()
+
+    def search_by_embedding(self, embedding: list[float], limit: int =10) -> list[dict]:
+        """Search for similar embeddings using pgvector's <=> operator."""
+        # THE FOLLOWING QUERY ASSUMES NO INDEX USED YET!! (CHECK Search Endpoint issue)
+        embedding_vector = embedding[0] if isinstance(embedding[0], (list, tuple, np.ndarray)) else embedding
+        query_sql = sql.SQL(
+            """
+            SELECT name, 1 - (embedding <=> %s::vector)
+            AS similarity FROM {table}
+            ORDER BY similarity DESC LIMIT %s;
+            """
+        ).format(table=sql.Identifier(self._table_name))
+
+        with self._pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(query_sql, (embedding_vector, limit))
+            rows = cur.fetchall()
+        return rows
+
+    def get_record_content(self, title: str) -> list[DocumentRecord]:
+        """Query specific record content based on title"""
+
+        query_sql = sql.SQL(
+            """
+            SELECT name, title, content FROM {table}
+            WHERE name LIKE %s
+            """
+        ).format(table=sql.Identifier(self._table_name))
+
+        pattern=f"%{title}%"
+
+        with self._pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(query_sql, (pattern,))
+            rows = cur.fetchall()
+
+        return rows
 
     def close(self) -> None:
         """Close the underlying connection pool."""

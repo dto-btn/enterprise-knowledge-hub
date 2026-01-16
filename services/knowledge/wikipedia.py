@@ -16,18 +16,12 @@ from dotenv import load_dotenv
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import DatabaseWikipediaItem, WikipediaItem
 from services.db.postgrespg import WikipediaDbRecord, WikipediaPgRepository
+from provider.embedding.qwen3.embedder_factory import get_embedder
 
 load_dotenv()
 
 PROGRESS_SUFFIX: str = ".progress"
 INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index(?P<chunk>\d*)\.txt\.bz2")
-
-if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_BACKEND", "LLAMA").upper() == "SENTENCE_TRANSFORMER":
-    from provider.embedding.qwen3.sentence_transformer import Qwen3SentenceTransformer
-    embedder = Qwen3SentenceTransformer()
-else:
-    from provider.embedding.qwen3.llama_embed import Qwen3LlamaCpp
-    embedder = Qwen3LlamaCpp()
 
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):
@@ -56,16 +50,23 @@ class WikipediaKnowedgeService(KnowledgeService):
         self._repository = repository or WikipediaPgRepository.from_env()
         self._pending: list[WikipediaDbRecord] = []
 
+    @property
+    def embedder(self):
+        """Get embedder"""
+        return get_embedder()
+
     def process_queue(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""
         try:
             item = WikipediaItem.from_dict(knowledge_item)
             self.logger.debug("Generating embeddings for %s", item.title)
 
-            max_tokens = embedder.max_seq_length
+            max_tokens = getattr(self.embedder, "max_seq_length", None)
+            if max_tokens is None:
+                max_tokens = getattr(getattr(self.embedder, "model", None), "max_seq_length", None)
 
-            chunks = embedder.chunk_text_by_tokens(item.content, max_tokens=max_tokens)
-            embeddings = embedder.embed(item.content)
+            chunks = self.embedder.chunk_text_by_tokens(item.content, max_tokens=max_tokens)
+            embeddings = self.embedder.embed(item.content)
 
             arr = np.asarray(embeddings)
             if arr.ndim == 1:
