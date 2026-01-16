@@ -1,3 +1,6 @@
+"""
+Docstring for router.database_interaction.endpoints
+"""
 from fastapi import APIRouter
 
 from services.db.model import DocumentRecord
