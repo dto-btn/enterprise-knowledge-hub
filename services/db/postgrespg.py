@@ -145,7 +145,7 @@ class WikipediaPgRepository:
             WHERE name LIKE %s
             """
         ).format(table=sql.Identifier(self._table_name))
-        
+
         pattern=f"%{title}%"
 
         with self._pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
