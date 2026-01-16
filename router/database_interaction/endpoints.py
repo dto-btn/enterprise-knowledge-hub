@@ -2,16 +2,12 @@
 Endpoints for interacting with the knowledge database.
 """
 from fastapi import APIRouter, Query
+
+from services.db.model import DocumentRecord
 from services.knowledge.query import QueryService
 
 router = APIRouter()
 _query_service = QueryService()
-
-@router.get("/test")
-def retrieve_wiki_articles(
-):
-    """Test endpoint to verify database interaction."""
-    print("hit test endpoint success")
 
 @router.get("/search")
 def search_database(
@@ -25,3 +21,10 @@ def search_database(
         "query": query,
         "results": results
     }
+
+@router.get("/retrieve/{title}")
+def retrieve_wiki_articles(
+    title:str
+) -> list[DocumentRecord]:
+    """Get wiki article content"""
+    return _query_service.get_article_content_by_title(title)
