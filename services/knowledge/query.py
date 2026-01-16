@@ -1,17 +1,8 @@
 """Service layer to query embedding in persistance layer"""
 from dataclasses import dataclass
-import os
 import logging
 from services.db.postgrespg import WikipediaPgRepository
-
-import logging
-
-if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_BACKEND", "LLAMA").upper() == "SENTENCE_TRANSFORMER":
-    from provider.embedding.qwen3.sentence_transformer import Qwen3SentenceTransformer
-    embedder = Qwen3SentenceTransformer()
-else:
-    from provider.embedding.qwen3.llama_embed import Qwen3LlamaCpp
-    embedder = Qwen3LlamaCpp()
+from provider.embedding.qwen3.embedder_factory import get_embedder
 
 @dataclass
 class QueryService():
@@ -22,6 +13,11 @@ class QueryService():
     def __init__(self, repository: WikipediaPgRepository | None = None):
         self._repository = repository or WikipediaPgRepository.from_env()
 
+    @property
+    def embedder(self):
+        """Get embedder"""
+        return get_embedder()
+
     def test(self):
         """Test method to verify service layer functionality."""
         print("servicelayer ok")
@@ -31,6 +27,6 @@ class QueryService():
 
     def search(self, query: str, limit: int =10):
         """Search Wikipedia articles by query embedding."""
-        query_embedding = embedder.embed(query)
+        query_embedding = self.embedder.embed(query)
         results = self._repository.search_by_embedding(query_embedding, limit)
         return results
