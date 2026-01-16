@@ -1,3 +1,6 @@
+"""
+Endpoints for interacting with the knowledge database.
+"""
 from fastapi import APIRouter, Query
 from services.knowledge.models import WikipediaItem
 from services.knowledge.query import QueryService

@@ -99,18 +99,19 @@ class WikipediaPgRepository:
         :rtype: WikipediaPgRepository
         """
 
-        # CHANGED FROM localhost to run locally
-        host = os.getenv("POSTGRES_HOST", "172.16.123.217")
+        #  (If running local connected to DB use 172.16.123.217 instead of localhost)
+        host = os.getenv("POSTGRES_HOST", "localhost")
         port = int(os.getenv("POSTGRES_PORT", "5432"))
         dbname = os.getenv("POSTGRES_DB", "postgres")
         user = os.getenv("POSTGRES_USER", "postgres")
-        password = os.getenv("POSTGRES_PASSWORD", "postconninfotgres")
+        # For running local connected to DB use "postconninfotgres" instead 
+        password = os.getenv("POSTGRES_PASSWORD", "postgres")
         table_name = os.getenv("WIKIPEDIA_TABLE", "documents")
         pool_size = int(os.getenv("POSTGRES_POOL_SIZE", "5"))
         batch_size = int(os.getenv("POSTGRES_BATCH_SIZE", "500"))
         conninfo = f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
-        print('==================conn info')
-        print(conninfo)
+        # print('==================conn info')
+        # print(conninfo)
 
         return cls(conninfo=conninfo, table_name=table_name, pool_size=pool_size, batch_size=batch_size)
 
@@ -140,6 +141,7 @@ class WikipediaPgRepository:
             conn.commit()
 
     def get_record(self):
+        """Fetch a few records for testing purposes."""
         query_sql = sql.SQL(
             """
             SELECT * FROM {table}
@@ -153,6 +155,7 @@ class WikipediaPgRepository:
         return rows
 
     def search_by_embedding(self, embedding: list[float], limit: int =10) -> list[dict]:
+        """Search for similar embeddings using pgvector's <=> operator."""
         # THE FOLLOWING QUERY ASSUMES NO INDEX USED YET!! (CHECK Search Endpoint issue)
         embedding_vector = embedding[0] if isinstance(embedding[0], (list, tuple, np.ndarray)) else embedding
         query_sql = sql.SQL(
