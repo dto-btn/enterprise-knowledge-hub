@@ -30,7 +30,7 @@ class QueryService():
         print(result)
 
     def search(self, query: str, limit: int =10):
-    """Search Wikipedia articles by query embedding."""
+        """Search Wikipedia articles by query embedding."""
         query_embedding = embedder.embed(query)
         results = self._repository.search_by_embedding(query_embedding, limit)
         return results
