@@ -22,7 +22,8 @@ class QueryService():
     def search(self, query: str, limit: int =10):
         """Search Wikipedia articles by query embedding."""
         query_embedding = self.embedder.embed(query)
-        results = self._repository.search_by_embedding(query_embedding, limit)
+        results = self._repository.search_by_embedding(query_embedding, limit, probes=250)
+        #results = self._repository.search_by_embedding(query_embedding, min_similarity=0.8, probes=60)
         return results
 
     def get_article_content_by_title(self, title: str) -> list[DocumentRecord]:

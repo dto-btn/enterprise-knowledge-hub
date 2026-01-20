@@ -70,13 +70,14 @@
         } else {
             // Create HTML for each result by extracting file path and relevance score
             console.log(typeof(results.results));
-            resultsDiv.innerHTML = results.results.map(([filePath, score], i) => {
+            resultsDiv.innerHTML = results.results.map(([filePath, content, node, score], i) => {
         // const fileName = filePath.split('/').pop(); // Extract the file name from the path
         return `
             <div class="result">
                 <button class="retrieveButton" data-id="${filePath}">
-                    <strong>Result ${i + 1}:</strong> ${filePath} (Score: ${score.toFixed(2)})
+                    <strong>Result ${i + 1}:</strong> ${filePath} (node ${node}) (Score: ${score.toFixed(2)})
                 </button>
+                // <p>Snippet: ${content}</p>
                 <div class="file-content" id="file-content-${i}" style="display: none;"></div>
             </div>
         `;
