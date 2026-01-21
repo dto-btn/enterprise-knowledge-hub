@@ -23,8 +23,10 @@ class QueryService():
 
     def search(self, query: str, limit: int =10) -> list[DocumentRecord]:
         """Search Wikipedia articles by query embedding."""
-        query_embedding = self.embedder.embed(query)
-        results = self._repository.search_by_embedding(query_embedding, limit, probes=40)
+        # Use is_query=True to apply the Qwen3 query instruction prefix
+        # This is critical for asymmetric retrieval (query vs document)
+        query_embedding = self.embedder.embed(query, is_query=True)
+        results = self._repository.search_by_embedding(query_embedding, limit, probes=150)
         parsed_results = []
         for res in results:
             res = DocumentRecord(
