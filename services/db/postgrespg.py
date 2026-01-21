@@ -148,7 +148,6 @@ class WikipediaPgRepository:
         embedding: list[float],
         limit: int = 100,
         probes: int = 100,
-        min_similarity: float = 0.0,
     ) -> list[dict]:
         """Search for similar embeddings using pgvector's <=> operator.
 
@@ -157,16 +156,11 @@ class WikipediaPgRepository:
             limit: Maximum number of results to return (acts as a safety cap).
             probes: Number of IVFFlat lists to search. Higher = better recall but slower.
                     With 3464 lists, recommended range is 60-350 (sqrt(lists) to lists/10).
-            min_similarity: Minimum similarity threshold (0.0 to 1.0). Only results with
-                           similarity >= this value are returned. Default 0.0 returns all.
         """
         embedding_vector = embedding[0] if isinstance(embedding[0], (list, tuple, np.ndarray)) else embedding
 
         # SET doesn't support parameterized values, so format directly (int is safe)
         set_probes_sql = sql.SQL("SET LOCAL ivfflat.probes = {}").format(sql.Literal(probes))
-
-        # Convert min_similarity to max_distance (distance = 1 - similarity for cosine)
-        max_distance = 1.0 - min_similarity
 
         # Use a larger limit for index scan, then filter by similarity threshold
         # The WHERE clause filters after the index scan finds candidates
@@ -174,7 +168,6 @@ class WikipediaPgRepository:
             """
             SELECT name, content, chunk_index, 1 - (embedding <=> %s::vector) AS similarity
             FROM {table}
-            WHERE (embedding <=> %s::vector) <= %s
             ORDER BY embedding <=> %s::vector
             LIMIT %s
             """
@@ -184,7 +177,7 @@ class WikipediaPgRepository:
             with conn.transaction():
                 with conn.cursor() as cur:
                     cur.execute(set_probes_sql)
-                    cur.execute(query_sql, (embedding_vector, embedding_vector, max_distance, embedding_vector, limit))
+                    cur.execute(query_sql, (embedding_vector, embedding_vector, limit))
                     rows = cur.fetchall()
         return rows
 
