@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-import time
 
 import numpy as np
 
@@ -57,7 +56,7 @@ class WikipediaKnowedgeService(KnowledgeService):
     def embedder(self):
         """Get embedder"""
         return get_embedder()
-    
+
     def run(self):
         """Run the knowledge ingestion/processing in parallel threads."""
         self.logger.info("Running knowledge ingestion for %s", self.service_name)
@@ -177,10 +176,7 @@ class WikipediaKnowedgeService(KnowledgeService):
                         self.logger.exception("Error processing item in %s: %s", self.service_name, e)
                         if delivery_tag is not None:
                             self.queue_service.read_ack(delivery_tag, successful=False)
-                # Queue is empty - check if we should exit or wait
-                # if self._producer_done.is_set():
-                #     break  # Producer done and queue empty.  This stops this queue altogether
-                # time.sleep(self._poll_interval)
+                    #Think about how to stop this worker
         except Exception as e:
             self.logger.exception("Error during processing for wikipedia embedding sink %s: %s", self.service_name, e)
 
