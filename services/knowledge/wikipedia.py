@@ -6,6 +6,7 @@ import bz2
 import os
 import re
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -56,6 +57,20 @@ class WikipediaKnowedgeService(KnowledgeService):
     def embedder(self):
         """Get embedder"""
         return get_embedder()
+    
+    def run(self):
+        """Run the knowledge ingestion/processing in parallel threads."""
+        self.logger.info("Running knowledge ingestion for %s", self.service_name)
+        self._producer_done.clear()
+        self._stats.reset()  # Reset stats at the start of each run
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            queue_future = executor.submit(self.queue_for_processing)
+            process_future = executor.submit(self.process)
+            insert_future = executor.submit(self.process_wikipedia_sink)
+            # Wait for both to complete and propagate any exceptions
+            queue_future.result()
+            process_future.result()
+            insert_future.result()
 
     def process_queue(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""

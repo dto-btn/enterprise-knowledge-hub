@@ -1,7 +1,6 @@
 """Base class for knowledge services."""
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 import logging
 import threading
@@ -25,17 +24,10 @@ class KnowledgeService(ABC):
         """Get the statistics tracker for this service."""
         return self._stats
 
+    @abstractmethod
     def run(self) -> None:
         """Run the knowledge ingestion/processing in parallel threads."""
-        self.logger.info("Running knowledge ingestion for %s", self.service_name)
-        self._producer_done.clear()
-        self._stats.reset()  # Reset stats at the start of each run
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            queue_future = executor.submit(self.queue_for_processing)
-            process_future = executor.submit(self.process)
-            # Wait for both to complete and propagate any exceptions
-            queue_future.result()
-            process_future.result()
+        raise NotImplementedError("Subclasses must implement the run method.")
 
     @abstractmethod
     def fetch_from_source(self) -> Iterator[KnowledgeItem]:
