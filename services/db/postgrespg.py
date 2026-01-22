@@ -20,7 +20,7 @@ from services.knowledge.models import DatabaseWikipediaItem
 load_dotenv()
 
 @dataclass(slots=True)
-class WikipediaDbRecord:
+class WikipediaDbRecord: #pylint: disable=too-many-instance-attributes
     """Serializable record for Postgres storage."""
     pid: int
     chunk_index: int
@@ -129,7 +129,7 @@ class WikipediaPgRepository:
         insert_sql = sql.SQL(
             """
             INSERT INTO {table} (pid, chunk_index, name, title, content, last_modified_date, embedding, source)
-            VALUES (%(pid)s, %(chunk_index)s, %(name)s, %(title)s, %(content)s, %(last_modified_date)s, %(embedding)s, %(source)s)
+            VALUES (%(pid)s, %(chunk_index)s, %(name)s, %(title)s, %(content)s, %(last_modified_date)s, %(embedding)s, %(source)s) #pylint: disable=line-too-long
             ON CONFLICT (pid, chunk_index) DO UPDATE SET
                 name = EXCLUDED.name,
                 title = EXCLUDED.title,

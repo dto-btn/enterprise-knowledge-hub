@@ -174,7 +174,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         prev_offset: int | None = None
 
         source_name = index_path.name .split("-")[0]
-        source = Source.WIKIPEDIA_EN if source_name == "enwiki" else Source.WIKIPEDIA_FR if source_name == "frwiki" else None
+        source = Source.WIKIPEDIA_EN if source_name == "enwiki" else Source.WIKIPEDIA_FR if source_name == "frwiki" else None #pylint: disable=line-too-long
 
         with open(dump_path, 'rb') as dump_file, bz2.open(index_path, mode='rt') as index_file:
             for line in index_file:
@@ -206,7 +206,7 @@ class WikipediaKnowedgeService(KnowledgeService):
             self.logger.warning("Skipping malformed line %d in %s", line_num, filename)
             return None
 
-    def _process_chunk(
+    def _process_chunk( #pylint: disable=too-many-arguments,too-many-positional-arguments
         self, dump_file, dump_name: str, prev_offset: int | None, offset: int, source: Source | None
     ) -> Iterator[WikipediaItem]:
         """Decompress and parse a chunk of the dump file."""
