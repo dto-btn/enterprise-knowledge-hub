@@ -9,6 +9,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import time
 
 import numpy as np
 
@@ -139,28 +140,32 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def store_item(self, item: DatabaseWikipediaItem, queue_name: str = QUEUE_BATCH_NAME) -> None:
         """Store the processed knowledge item into the knowledge base."""
-        record = WikipediaDbRecord.from_item(item)
-        self.queue_service.write(queue_name, record) # need to serialize
-        # no batch, just insert one by one
-        
-    # def finalize_processing(self) -> None:
-    #     self._flush_pending()
+        queue_item = item.to_dict()
+        self.queue_service.write(queue_name, queue_item)
 
     def process_wikipedia_sink(self) -> None:
+        """
+            Process wikipedia embedding sink queue
+            Inserts into database essentially
+        """
         self.logger.info("Processing wikipedia embedding sink data. (%s)", self.service_name)
         try:
             while True:
-                # Drain all available messages
                 for item, delivery_tag in self.queue_service.read(QUEUE_BATCH_NAME):
                     try:
-                        self.logger.info("insert here")
-                        # insert into db
-                        # make sure ack after.
+                        #lol we can fix this afterwards.  So much conversion
+                        wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
+                        record_to_insert = WikipediaDbRecord.from_item(wiki_item)
+                        self._repository.insert(record_to_insert.as_mapping())
+                        self.queue_service.read_ack(delivery_tag, successful=True)
                     except Exception as e:
                         self.logger.exception("Error processing item in %s: %s", self.service_name, e)
-                        # if delivery_tag is not None:
-                        #     self.queue_service.read_ack(delivery_tag, successful=False)
+                        if delivery_tag is not None:
+                            self.queue_service.read_ack(delivery_tag, successful=False)
                 # Queue is empty - check if we should exit or wait
+                if self._producer_done.is_set():
+                    break  # Producer done and queue empty
+                time.sleep(self._poll_interval)
         except Exception as e:
             self.logger.exception("Error during processing for wikipedia embedding sink %s: %s", self.service_name, e)
 
