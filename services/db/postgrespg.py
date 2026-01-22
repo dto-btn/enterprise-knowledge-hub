@@ -29,6 +29,7 @@ class WikipediaDbRecord:
     content: str
     last_modified_date: datetime | None
     embedding: list[float]
+    source: str | None = None
 
     @classmethod
     def from_item(cls, item: DatabaseWikipediaItem) -> "WikipediaDbRecord":
@@ -42,6 +43,7 @@ class WikipediaDbRecord:
             content=item.content,
             last_modified_date=item.last_modified_date,
             embedding=embedding,
+            source=item.source,
         )
 
     def as_mapping(self) -> dict[str, object]:
@@ -54,6 +56,7 @@ class WikipediaDbRecord:
             "content": self.content,
             "last_modified_date": self.last_modified_date,
             "embedding": self.embedding,
+            "source": self.source,
         }
 
     @staticmethod
@@ -125,14 +128,15 @@ class WikipediaPgRepository:
 
         insert_sql = sql.SQL(
             """
-            INSERT INTO {table} (pid, chunk_index, name, title, content, last_modified_date, embedding)
-            VALUES (%(pid)s, %(chunk_index)s, %(name)s, %(title)s, %(content)s, %(last_modified_date)s, %(embedding)s)
+            INSERT INTO {table} (pid, chunk_index, name, title, content, last_modified_date, embedding, source)
+            VALUES (%(pid)s, %(chunk_index)s, %(name)s, %(title)s, %(content)s, %(last_modified_date)s, %(embedding)s, %(source)s)
             ON CONFLICT (pid, chunk_index) DO UPDATE SET
                 name = EXCLUDED.name,
                 title = EXCLUDED.title,
                 content = EXCLUDED.content,
                 last_modified_date = EXCLUDED.last_modified_date,
-                embedding = EXCLUDED.embedding
+                embedding = EXCLUDED.embedding,
+                source = EXCLUDED.source
             """
         ).format(table=sql.Identifier(self._table_name))
 
