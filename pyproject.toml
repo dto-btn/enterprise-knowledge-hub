@@ -45,7 +45,7 @@ no-build-isolation-package = ["flash-attn"]
 #llama-cpp-python = { CMAKE_ARGS = "-DGGML_CUDA=on -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc" }
 
 # Metal support (Apple Silicon)
-llama-cpp-python = { CMAKE_ARGS = "-DGGML_METAL=on" }
+# llama-cpp-python = { CMAKE_ARGS = "-DGGML_METAL=on" }
 
 # OpenBLAS support
 # llama-cpp-python = { CMAKE_ARGS = "-DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS" }
