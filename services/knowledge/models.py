@@ -11,11 +11,7 @@ import numpy as np
 Tensor = torch.Tensor
 
 def _encode_embeddings(embedding: Union[np.ndarray, Tensor, None]) -> Optional[Dict[str, Any]]:
-    """
-    Convert embeddings into a JSON-serializable dict:
-    - None -> None
-    - np.ndarray / torch.Tensor -> {"kind", "dtype", "shape", "data_b64"}
-    """
+    """Convert embeddings into a JSON-serializable dict"""
     if embedding is None:
         return None
 
@@ -42,13 +38,7 @@ def _encode_embeddings(embedding: Union[np.ndarray, Tensor, None]) -> Optional[D
     }
 
 def _decode_embeddings(payload: Optional[Dict[str, Any]]) -> Union[np.ndarray, Tensor, None]:
-    """
-    Reverse of _encode_embeddings.
-    Returns:
-    - np.ndarray if kind == "numpy"
-    - torch.Tensor if kind == "torch" (requires torch installed)
-    - None if payload is None
-    """
+    """Reverse of _encode_embeddings"""
     if payload is None:
         return None
 
