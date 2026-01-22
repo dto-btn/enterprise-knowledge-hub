@@ -17,7 +17,7 @@ from wikitextparser import remove_markup
 from provider.embedding.qwen3.embedder_factory import get_embedder
 from services.db.postgrespg import WikipediaDbRecord, WikipediaPgRepository
 from services.knowledge.base import KnowledgeService
-from services.knowledge.models import DatabaseWikipediaItem, WikipediaItem
+from services.knowledge.models import DatabaseWikipediaItem, Source, WikipediaItem
 
 load_dotenv()
 
@@ -173,6 +173,9 @@ class WikipediaKnowedgeService(KnowledgeService):
         current_line = 0
         prev_offset: int | None = None
 
+        source_name = index_path.name .split("-")[0]
+        source = Source.WIKIPEDIA_EN if source_name == "enwiki" else Source.WIKIPEDIA_FR if source_name == "frwiki" else None
+
         with open(dump_path, 'rb') as dump_file, bz2.open(index_path, mode='rt') as index_file:
             for line in index_file:
                 current_line += 1
@@ -185,7 +188,7 @@ class WikipediaKnowedgeService(KnowledgeService):
                     prev_offset = offset
                     continue
 
-                yield from self._process_chunk(dump_file, dump_path.name, prev_offset, offset)
+                yield from self._process_chunk(dump_file, dump_path.name, prev_offset, offset, source)
                 prev_offset = offset
 
                 if current_line % self._progress_flush_interval == 0:
@@ -204,7 +207,7 @@ class WikipediaKnowedgeService(KnowledgeService):
             return None
 
     def _process_chunk(
-        self, dump_file, dump_name: str, prev_offset: int | None, offset: int
+        self, dump_file, dump_name: str, prev_offset: int | None, offset: int, source: Source | None
     ) -> Iterator[WikipediaItem]:
         """Decompress and parse a chunk of the dump file."""
         if prev_offset is None:
@@ -220,14 +223,14 @@ class WikipediaKnowedgeService(KnowledgeService):
         try:
             decompressed = bz2.decompress(data)
             xml_content = decompressed.decode("utf-8", errors="ignore")
-            yield from self._extract_pages_from_xml(xml_content)
+            yield from self._extract_pages_from_xml(xml_content, source)
         except OSError as exc:
             self.logger.error(
                 "Failed to decompress chunk from %s between offsets %s and %s: %s",
                 dump_name, prev_offset, offset, exc
             )
 
-    def _extract_pages_from_xml(self, xml_content: str) -> Iterator[WikipediaItem]:
+    def _extract_pages_from_xml(self, xml_content: str, source: Source | None) -> Iterator[WikipediaItem]:
         """Extract and parse all pages from XML content."""
         for page_match in re.finditer(r"<page>(.*?)</page>", xml_content, re.DOTALL):
             page_xml = page_match.group(0)
@@ -249,6 +252,7 @@ class WikipediaKnowedgeService(KnowledgeService):
             if not self._should_ignore_page(page_xml):
                 item = self._parse_page_xml(page_xml)
                 if item:
+                    item.source = source
                     yield item
 
     def _save_progress(self, index_path: Path, line_number: int) -> None:
@@ -283,7 +287,8 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def _should_ignore_page(self, xml_page: str) -> bool:
         """Check if a page should be ignored based on title or type."""
-                #Namespace detection: https://en.wikipedia.org/wiki/Wikipedia:Namespace
+
+        #Namespace detection: https://en.wikipedia.org/wiki/Wikipedia:Namespace
         if not re.search(r"<ns>0</ns>", xml_page):
             return True
 
