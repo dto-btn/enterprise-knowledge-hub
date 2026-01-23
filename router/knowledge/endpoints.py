@@ -35,7 +35,15 @@ def _run_wikipedia_task():
     finally:
         _wikipedia_state.stop()
 
-
+@router.get("/stop")
+def wikipedia_stop():
+    """Graceful shutdown of indexing process"""
+    # code here
+    
+    return {
+        "message": "Wikipedia run gracefully shutdown."
+    }
+    
 @router.get("/wikipedia/run")
 def wikipedia_run(background_tasks: BackgroundTasks):
     """Endpoint to trigger Wikipedia full run"""
