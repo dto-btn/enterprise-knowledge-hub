@@ -35,8 +35,8 @@ def _run_wikipedia_task():
     finally:
         _wikipedia_state.stop()
 
-@router.get("/stop")
-def wikipedia_stop():
+@router.get("/wikipedia/stop") # or just /stop for generic
+def wikipedia_stop(): #stop_service for a more generic name, if this can be re-used for different sources
     """Graceful shutdown of indexing process"""
     # code here
     
