@@ -51,6 +51,11 @@ class KnowledgeService(ABC):
     def store_item(self, item: KnowledgeItem) -> None:
         """Store the processed knowledge item into the knowledge base."""
         raise NotImplementedError("Subclasses must implement the store_item method.")
+    
+    @abstractmethod
+    def request_stop(self):
+        """Request for the current run to stop"""
+        raise NotImplementedError("Subclasses must implement the store_item method.")
 
     def queue_for_processing(self) -> None:
         """Ingest data into the knowledge base."""
