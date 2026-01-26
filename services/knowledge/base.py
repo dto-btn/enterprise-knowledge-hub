@@ -25,7 +25,8 @@ class KnowledgeService(ABC):
     _producer_done: threading.Event = field(default_factory=threading.Event, init=False)
     _poll_interval: float = 0.5  # seconds to wait before retrying empty queue
     _stats: KnowledgeServiceStats = field(default_factory=KnowledgeServiceStats, init=False)
-
+    _is_ingestion_queue_complete = False
+    
     @property
     def stats(self) -> KnowledgeServiceStats:
         """Get the statistics tracker for this service."""
@@ -103,7 +104,7 @@ class KnowledgeService(ABC):
                         self._ack_message(delivery_tag, successful=False)
                 # Queue is empty - check if we should exit or wait
                 if self._should_stop():
-                    break  # Producer done and queue empty
+                    break  # Producer done and ingestion queue empty
                 time.sleep(self._poll_interval)
         except Exception as e:
             self.logger.exception("Error during processing for %s: %s", self.service_name, e)
@@ -133,14 +134,15 @@ class KnowledgeService(ABC):
                     except Exception as e:
                         self.logger.exception("Error processing item in %s: %s", self.service_name, e)
                         self._ack_message(delivery_tag, successful=False)
-                if self._should_stop():
-                    break  # Producer done and queue empty
+                if self._should_stop() and self._get_is_ingestion_queue_complete():
+                    break  # Producer done and ingestion queue and sink queue empty
                 time.sleep(self._poll_interval)
         except Exception as e:
             self.logger.exception("Error during processing for wikipedia embedding sink %s: %s", self.service_name, e)
 
     def finalize_processing(self) -> None:
         """Optional hook called after processing loop ends."""
+        self._is_ingestion_queue_complete = True
         return
 
     def _ack_message(self, delivery_tag, successful: bool):
@@ -149,5 +151,10 @@ class KnowledgeService(ABC):
             
     def _should_stop(self) -> bool:
         if self._producer_done.is_set() or self.shutdown_service.should_stop():
+            return True
+        return False
+    
+    def _get_is_ingestion_queue_complete(self) -> bool:
+        if self._is_ingestion_queue_complete is not None and self._is_ingestion_queue_complete:
             return True
         return False
