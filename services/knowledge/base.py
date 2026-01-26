@@ -1,13 +1,18 @@
 """Base class for knowledge services."""
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import threading
 import time
-from services.knowledge.models import KnowledgeItem
+from services.knowledge.models import KnowledgeItem, DatabaseWikipediaItem
 from services.queue.queue_service import QueueService
 from services.stats.knowledge_service_stats import KnowledgeServiceStats
+from services.db.postgrespg import WikipediaDbRecord
+
+QUEUE_BATCH_NAME = "wikipedia_embeddings_sink"
 
 @dataclass
 class KnowledgeService(ABC):
@@ -24,10 +29,19 @@ class KnowledgeService(ABC):
         """Get the statistics tracker for this service."""
         return self._stats
 
-    @abstractmethod
     def run(self) -> None:
         """Run the knowledge ingestion/processing in parallel threads."""
-        raise NotImplementedError("Subclasses must implement the run method.")
+        self.logger.info("Running knowledge ingestion for %s", self.service_name)
+        self._producer_done.clear()
+        self._stats.reset()  # Reset stats at the start of each run
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            queue_future = executor.submit(self.queue_for_processing)
+            process_future = executor.submit(self.process)
+            insert_future = executor.submit(self.process_wikipedia_sink)
+            # Wait for both to complete and propagate any exceptions
+            queue_future.result()
+            process_future.result()
+            insert_future.result()
 
     @abstractmethod
     def fetch_from_source(self) -> Iterator[KnowledgeItem]:
@@ -43,6 +57,11 @@ class KnowledgeService(ABC):
     def store_item(self, item: KnowledgeItem) -> None:
         """Store the processed knowledge item into the knowledge base."""
         raise NotImplementedError("Subclasses must implement the store_item method.")
+    
+    @abstractmethod
+    def insert_item(self, item: dict[str, object]) -> None:
+        """Insert the object into repository"""
+        raise NotImplementedError("Subclasses must implement the insert_item method.")
     
     @abstractmethod
     def request_stop(self):
@@ -92,6 +111,29 @@ class KnowledgeService(ABC):
             except Exception as e:
                 self.logger.exception("Error during finalize_processing for %s: %s", self.service_name, e)
             self.logger.info("Done processing ingested data. (%s)", self.service_name)
+
+    def process_wikipedia_sink(self) -> None:
+        """
+            Process wikipedia embedding sink queue
+            Inserts into database essentially
+        """
+        self.logger.info("Processing wikipedia embedding sink data. (%s)", self.service_name)
+        try:
+            while True:
+                for item, delivery_tag in self.queue_service.read(QUEUE_BATCH_NAME):
+                    try:
+                        #lol we can fix this afterwards.  So much conversion
+                        wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
+                        record_to_insert = WikipediaDbRecord.from_item(wiki_item)
+                        if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
+                            self.insert_item(record_to_insert.as_mapping())
+                        self.queue_service.read_ack(delivery_tag, successful=True)
+                    except Exception as e:
+                        self.logger.exception("Error processing item in %s: %s", self.service_name, e)
+                        self._ack_message(delivery_tag, successful=False)
+                    #Think about how to stop this worker
+        except Exception as e:
+            self.logger.exception("Error during processing for wikipedia embedding sink %s: %s", self.service_name, e)
 
     def finalize_processing(self) -> None:
         """Optional hook called after processing loop ends."""
