@@ -131,7 +131,9 @@ class KnowledgeService(ABC):
                     except Exception as e:
                         self.logger.exception("Error processing item in %s: %s", self.service_name, e)
                         self._ack_message(delivery_tag, successful=False)
-                    #Think about how to stop this worker
+                if self._producer_done.is_set():
+                    break  # Producer done and queue empty
+                time.sleep(self._poll_interval)
         except Exception as e:
             self.logger.exception("Error during processing for wikipedia embedding sink %s: %s", self.service_name, e)
 
