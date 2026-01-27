@@ -154,7 +154,6 @@ class KnowledgeService(ABC):
     def finalize_processing(self) -> None:
         """Optional hook called after processing loop ends."""
         self._is_ingestion_queue_complete = True
-        return
 
     def _ack_message(self, delivery_tag, successful: bool):
         """Acknoledge or unack message back to queue"""
