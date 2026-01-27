@@ -86,10 +86,14 @@ class KnowledgeService(ABC):
         self.logger.info("Processing ingested data. (%s)", self.service_name)
         queue_name = self.service_name + ".ingest"
         try:
-            while self._stop_event.is_set():
+            while not self._stop_event.is_set():
                 # Drain all available messages
                 for item, delivery_tag in self.queue_service.read(queue_name):
                     try:
+                        if self._stop_event.is_set():
+                            self.logger.info("Stop event is true.  Stopping process loop")
+                            self._ack_message(delivery_tag, successful=False)
+                            break
                         processed = self.process_queue(item) # GPU work happens here
                         items = processed if isinstance(processed, list) else [processed]
                         for item_with_embedding in items:
@@ -119,15 +123,19 @@ class KnowledgeService(ABC):
         """
         self.logger.info("Processing wikipedia embedding sink data. (%s)", self.service_name)
         try:
-            while self._stop_event.is_set():
+            while not self._stop_event.is_set():
                 for item, delivery_tag in self.queue_service.read(QUEUE_BATCH_NAME):
                     try:
+                        if self._stop_event.is_set():
+                            self.logger.info("Stop event is true.  Stopping wiki sink loop")
+                            self._ack_message(delivery_tag, successful=False)
+                            break
                         #lol we can fix this afterwards.  So much conversion
                         wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
                         record_to_insert = WikipediaDbRecord.from_item(wiki_item)
                         if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
                             self.insert_item(record_to_insert.as_mapping())
-                        self.queue_service.read_ack(delivery_tag, successful=True)
+                        self._ack_message(delivery_tag, successful=True)
                     except Exception as e:
                         self.logger.exception("Error processing item in %s: %s", self.service_name, e)
                         self._ack_message(delivery_tag, successful=False)
@@ -136,6 +144,12 @@ class KnowledgeService(ABC):
                 time.sleep(self._poll_interval)
         except Exception as e:
             self.logger.exception("Error during processing for wikipedia embedding sink %s: %s", self.service_name, e)
+        finally:
+            try:
+                self.finalize_processing()
+            except Exception as e:
+                self.logger.exception("Error during finalize_processing for %s: %s", self.service_name, e)
+            self.logger.info("Done processing wiki sink data. (%s)", self.service_name)
 
     def finalize_processing(self) -> None:
         """Optional hook called after processing loop ends."""
