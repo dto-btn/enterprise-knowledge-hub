@@ -6,7 +6,6 @@ import bz2
 import os
 import re
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -67,20 +66,6 @@ class WikipediaKnowedgeService(KnowledgeService):
     def embedder(self):
         """Get embedder"""
         return get_embedder()
-
-    def run(self):
-        """Run the knowledge ingestion/processing in parallel threads."""
-        self.logger.info("Running knowledge ingestion for %s", self.service_name)
-        self._producer_done.clear()
-        self._stats.reset()  # Reset stats at the start of each run
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            queue_future = executor.submit(self.queue_for_processing)
-            process_future = executor.submit(self.process)
-            insert_future = executor.submit(self.process_wikipedia_sink)
-            # Wait for both to complete and propagate any exceptions
-            queue_future.result()
-            process_future.result()
-            insert_future.result()
 
     def process_queue(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""
@@ -169,28 +154,8 @@ class WikipediaKnowedgeService(KnowledgeService):
         queue_item = item.to_dict()
         self.queue_service.write(queue_name, queue_item)
 
-    def process_wikipedia_sink(self) -> None:
-        """
-            Process wikipedia embedding sink queue
-            Inserts into database essentially
-        """
-        self.logger.info("Processing wikipedia embedding sink data. (%s)", self.service_name)
-        try:
-            while True:
-                for item, delivery_tag in self.queue_service.read(QUEUE_BATCH_NAME):
-                    try:
-                        #lol we can fix this afterwards.  So much conversion
-                        wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
-                        record_to_insert = WikipediaDbRecord.from_item(wiki_item)
-                        if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
-                            self._repository.insert(record_to_insert.as_mapping())
-                        self.queue_service.read_ack(delivery_tag, successful=True)
-                    except Exception as e:
-                        self.logger.exception("Error processing item in %s: %s", self.service_name, e)
-                        self._ack_message(delivery_tag, successful=False)
-                    #Think about how to stop this worker
-        except Exception as e:
-            self.logger.exception("Error during processing for wikipedia embedding sink %s: %s", self.service_name, e)
+    def insert_item(self, item: dict[str, object]) -> None:
+        self._repository.insert(item)
 
     def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]:
         """Process a single index file and yield WikipediaItems."""

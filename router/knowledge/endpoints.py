@@ -27,7 +27,6 @@ _queue_service = QueueService(queue_provider=RabbitMQProvider(url=os.getenv("RAB
 _wikipedia_service = WikipediaKnowedgeService(queue_service=_queue_service, logger=logger)
 _wikipedia_state = RunState()
 
-
 def _run_wikipedia_task():
     """Wrapper that manages the running state flag."""
     try:
@@ -35,6 +34,13 @@ def _run_wikipedia_task():
     finally:
         _wikipedia_state.stop()
 
+@router.get("/stop")
+async def stop_service():
+    """
+    Endpoint to stop current running process
+    """
+    _wikipedia_service.request_stop()
+    return {"status": "stopping"}
 
 @router.get("/wikipedia/run")
 def wikipedia_run(background_tasks: BackgroundTasks):
