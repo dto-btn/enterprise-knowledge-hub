@@ -49,7 +49,7 @@ class KnowledgeService(ABC):
         raise NotImplementedError("Subclasses must implement the read method.")
 
     @abstractmethod
-    def process_queue(self, knowledge_item: dict[str, object]):
+    def process_item(self, knowledge_item: dict[str, object]):
         """Process ingested data from the queue. May return a single item or a list of items."""
         raise NotImplementedError("Subclasses must implement the process method.")
 
@@ -67,7 +67,7 @@ class KnowledgeService(ABC):
         """Return ingestion queue name.  Ingest raw source into embedding ready units"""
         return self.service_name + ".raw"
 
-    def _process_queue_name(self) -> str:
+    def _processed_queue_name(self) -> str:
         """Return indexing queue name. Post-embedding, pre-storage ready units"""
         return self.service_name + ".processed"
 
@@ -78,7 +78,8 @@ class KnowledgeService(ABC):
             for item in self.fetch_from_source():
                 if self._stop_event.is_set():
                     break
-                self.queue_service.write(self._ingest_queue_name(), item.to_dict())
+                # TODO AR: store_item() is an abstract.  are we making this abstract too then?
+                self.queue_service.write(self._ingest_queue_name(), item.to_dict())  
                 self._stats.record_added()
         except Exception as e:
             self.logger.exception("Error during ingestion for %s: %s", self.service_name, e)
@@ -98,10 +99,11 @@ class KnowledgeService(ABC):
         )
 
         def handler(item: dict[str, object]) -> None:
-            processed = self.process_queue(item) # GPU work happens here
+            processed = self.process_item(item) # GPU work happens here
             items = processed if isinstance(processed, list) else [processed]
             for item_with_embedding in items:
-                self.store_item(item_with_embedding)
+                # TODO AR:store_item function name to change, emit_processed_item(), publish_processed_item()
+                self.store_item(item_with_embedding) #TODO AR: make this generic as to not need abstractmethod?
             self._stats.record_processed()
 
         def should_exit(drained_any: bool) -> bool:
@@ -134,7 +136,7 @@ class KnowledgeService(ABC):
             Process {service_name}.processed queue
             Inserts into database
         """
-        self.logger.info("Processing processed data from queue: %s. (%s)", self._process_queue_name(),
+        self.logger.info("Processing processed data from queue: %s. (%s)", self._processed_queue_name(),
                                                                         self.service_name)
 
         worker = QueueWorker(
@@ -154,13 +156,13 @@ class KnowledgeService(ABC):
 
         try:
             worker.run(
-                queue_name=self._process_queue_name(),
+                queue_name=self._processed_queue_name(),
                 service_name=self.service_name,
                 handler=handler,
                 should_exit=should_exit
             )
         except Exception as e:
-            self.logger.exception("Error during processing for queue: %s. (%s)", self._process_queue_name(),
+            self.logger.exception("Error during processing for queue: %s. (%s)", self._processed_queue_name(),
                                                                             self.service_name)
             self.logger.exception("Error: %s", e)
         finally:
@@ -168,9 +170,9 @@ class KnowledgeService(ABC):
                 self.finalize_processing()
             except Exception as e:
                 self.logger.exception("Error during finalize_processing for queue: %s. (%s)",
-                                                                        self._process_queue_name(), self.service_name)
+                                                                        self._processed_queue_name(), self.service_name)
                 self.logger.exception("Error: %s", e)
-            self.logger.info("Done processing ingested data from queue: %s. (%s)", self._process_queue_name(),
+            self.logger.info("Done processing ingested data from queue: %s. (%s)", self._processed_queue_name(),
                                                                             self.service_name)
 
     def finalize_processing(self) -> None:
