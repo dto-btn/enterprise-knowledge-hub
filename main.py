@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 app.include_router(frontend_router, prefix="/frontend", tags=["Frontend"])
-app.include_router(endpoints, prefix=KNOWLEDGE_BASE, tags=["Knowledge","Indexer","Ingest","Vector"])
+app.include_router(endpoints, prefix=KNOWLEDGE_BASE, tags=["Knowledge (Indexing Operations)"])
 app.include_router(db_endpoints, prefix="/database", tags=["Database Interaction"])
 
 @app.get("/health")

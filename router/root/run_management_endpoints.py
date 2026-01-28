@@ -34,8 +34,8 @@ def _run_wikipedia_task():
     finally:
         _wikipedia_state.stop()
 
-@router.get("/stop")
-async def stop_service():
+@router.get("/wikipedia/stop")
+async def stop_wikipedia_run():
     """
     Endpoint to stop current running process
     """
