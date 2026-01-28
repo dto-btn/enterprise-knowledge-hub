@@ -35,9 +35,9 @@ class KnowledgeService(ABC):
         self._stop_event.clear()
         self._stats.reset()  # Reset stats at the start of each run
         with ThreadPoolExecutor(max_workers=3) as executor:
-            queue_future = executor.submit(self.queue_for_processing)
-            process_future = executor.submit(self.process_ingestion_queue)
-            insert_future = executor.submit(self.process_indexing_queue)
+            queue_future = executor.submit(self.ingest)
+            process_future = executor.submit(self.process)
+            insert_future = executor.submit(self.store)
             # Wait for both to complete and propagate any exceptions
             queue_future.result()
             process_future.result()
@@ -65,13 +65,13 @@ class KnowledgeService(ABC):
 
     def _ingestion_queue_name(self) -> str:
         """Return ingestion queue name.  Ingest raw source into embedding ready units"""
-        return self.service_name + ".ingest"
+        return self.service_name + ".raw"
 
     def _indexing_queue_name(self) -> str:
         """Return indexing queue name. Post-embedding, pre-storage ready units"""
-        return self.service_name + ".indexing"
+        return self.service_name + ".processed"
 
-    def queue_for_processing(self) -> None:
+    def ingest(self) -> None:
         """Ingest data into the knowledge base."""
         self.logger.info("Ingesting data into the knowledge base. (%s)", self.service_name)
         try:
@@ -86,7 +86,7 @@ class KnowledgeService(ABC):
             self._producer_done.set()  # Signal that producer is finished
             self.logger.info("Done ingestion for %s", self.service_name)
 
-    def process_ingestion_queue(self) -> None:
+    def process(self) -> None:
         """Process ingested data. Keeps polling until producer is done and queue is empty."""
         self.logger.info("Processing ingested data. (%s)", self.service_name)
         try:
@@ -120,7 +120,7 @@ class KnowledgeService(ABC):
                 self.logger.exception("Error during finalize_processing for %s: %s", self.service_name, e)
             self.logger.info("Done processing ingested data. (%s)", self.service_name)
 
-    def process_indexing_queue(self) -> None:
+    def store(self) -> None:
         """
             Process wikipedia embedding sink queue
             Inserts into database essentially
