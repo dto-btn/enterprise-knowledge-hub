@@ -63,11 +63,11 @@ class KnowledgeService(ABC):
         """Insert the object into repository"""
         raise NotImplementedError("Subclasses must implement the insert_item method.")
 
-    def _ingestion_queue_name(self) -> str:
+    def _ingest_queue_name(self) -> str:
         """Return ingestion queue name.  Ingest raw source into embedding ready units"""
         return self.service_name + ".raw"
 
-    def _indexing_queue_name(self) -> str:
+    def _process_queue_name(self) -> str:
         """Return indexing queue name. Post-embedding, pre-storage ready units"""
         return self.service_name + ".processed"
 
@@ -78,7 +78,7 @@ class KnowledgeService(ABC):
             for item in self.fetch_from_source():
                 if self._stop_event.is_set():
                     break
-                self.queue_service.write(self._ingestion_queue_name(), item.to_dict())
+                self.queue_service.write(self._ingest_queue_name(), item.to_dict())
                 self._stats.record_added()
         except Exception as e:
             self.logger.exception("Error during ingestion for %s: %s", self.service_name, e)
@@ -92,7 +92,7 @@ class KnowledgeService(ABC):
         try:
             while not self._stop_event.is_set():
                 # Drain all available messages
-                for item, delivery_tag in self.queue_service.read(self._ingestion_queue_name()):
+                for item, delivery_tag in self.queue_service.read(self._ingest_queue_name()):
                     try:
                         if self._stop_event.is_set():
                             self.logger.info("Stop event is true.  Stopping process loop")
@@ -128,7 +128,7 @@ class KnowledgeService(ABC):
         self.logger.info("Processing wikipedia embedding sink data. (%s)", self.service_name)
         try:
             while not self._stop_event.is_set():
-                for item, delivery_tag in self.queue_service.read(self._indexing_queue_name()):
+                for item, delivery_tag in self.queue_service.read(self._process_queue_name()):
                     try:
                         if self._stop_event.is_set():
                             self.logger.info("Stop event is true.  Stopping wiki sink loop")
