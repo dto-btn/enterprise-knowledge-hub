@@ -9,7 +9,7 @@ from services.database.database_service import QueryService
 router = APIRouter()
 _query_service = QueryService()
 
-@router.get("/search")
+@router.get("/search/wikipedia")
 def search_database(
     query: str = Query(..., description="Search query"),
     limit: int = Query(10, description="Number of results to return")
@@ -22,7 +22,7 @@ def search_database(
         "results": results
     }
 
-@router.get("/retrieve/{title}")
+@router.get("/retrieve/wikipedia/{title}")
 def retrieve_wiki_articles(
     title:str
 ) -> list[DocumentRecord]:

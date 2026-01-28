@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 router = APIRouter()
 
 @router.get("/")
-def read_index():
+def dev_frontend():
     """Serve the index.html file."""
     return FileResponse("router/frontend/index.html")
 
