@@ -67,7 +67,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         """Get embedder"""
         return get_embedder()
 
-    def process_queue(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
+    def process_item(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""
         try:
             item = WikipediaItem.from_dict(knowledge_item)
@@ -131,6 +131,9 @@ class WikipediaKnowedgeService(KnowledgeService):
             except OSError as exc:
                 self.logger.error("Failed to process index file %s: %s. Continuing to next file.", index_path, exc)
                 continue
+            
+    def emit_fetched_item(self, item) -> None:
+        self.queue_service.write(self._ingest_queue_name(), item.to_dict())  
 
     def _get_dump_path(self, index_path: Path) -> Path | None:
         """Derive the dump file path from an index file path."""

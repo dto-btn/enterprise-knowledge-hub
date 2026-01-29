@@ -47,6 +47,11 @@ class KnowledgeService(ABC):
     def fetch_from_source(self) -> Iterator[KnowledgeItem]:
         """Read data from a source that can be anything and will pass the message to the ingest queue."""
         raise NotImplementedError("Subclasses must implement the read method.")
+    
+    @abstractmethod
+    def emit_fetched_item(self, item: KnowledgeItem) -> None:
+        """Take read item, transform as needed and pass the message to the ingest queue"""
+        raise NotImplementedError("Subclasses must implement the emit_fetched_item method.")
 
     @abstractmethod
     def process_item(self, knowledge_item: dict[str, object]):
@@ -79,7 +84,7 @@ class KnowledgeService(ABC):
                 if self._stop_event.is_set():
                     break
                 # TODO AR: store_item() is an abstract.  are we making this abstract too then?
-                self.queue_service.write(self._ingest_queue_name(), item.to_dict())  
+                self.emit_fetched_item(item)
                 self._stats.record_added()
         except Exception as e:
             self.logger.exception("Error during ingestion for %s: %s", self.service_name, e)
@@ -99,8 +104,9 @@ class KnowledgeService(ABC):
         )
 
         def handler(item: dict[str, object]) -> None:
-            processed = self.process_item(item) # GPU work happens here
-            items = processed if isinstance(processed, list) else [processed]
+            processed = self.process_item(item) # GPU work happens here 
+            #processed = list[knowledgeitem]
+            items: list[KnowledgeItem] = processed if isinstance(processed, list) else [processed]
             for item_with_embedding in items:
                 # TODO AR:store_item function name to change, emit_processed_item(), publish_processed_item()
                 self.store_item(item_with_embedding) #TODO AR: make this generic as to not need abstractmethod?
