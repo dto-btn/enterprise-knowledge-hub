@@ -45,9 +45,9 @@ class KnowledgeService(ABC):
 
     @abstractmethod
     def fetch_from_source(self) -> Iterator[KnowledgeItem]:
-        """Read data from a source that can be anything and will pass the message to the ingest queue."""
+        """Read data from a source that can be anything and transform into KnowledgeItem object"""
         raise NotImplementedError("Subclasses must implement the read method.")
-    
+
     @abstractmethod
     def emit_fetched_item(self, item: KnowledgeItem) -> None:
         """Take read item, transform as needed and pass the message to the ingest queue"""
@@ -59,14 +59,18 @@ class KnowledgeService(ABC):
         raise NotImplementedError("Subclasses must implement the process method.")
 
     @abstractmethod
-    def store_item(self, item: KnowledgeItem) -> None:
+    def emit_processed_item(self, item: KnowledgeItem) -> None:
         """Store the processed knowledge item into the knowledge base."""
         raise NotImplementedError("Subclasses must implement the store_item method.")
+    # @abstractmethod
+    # def store_item(self, item: KnowledgeItem) -> None:
+    #     """Store the processed knowledge item into the knowledge base."""
+    #     raise NotImplementedError("Subclasses must implement the store_item method.")
 
-    @abstractmethod
-    def insert_item(self, item: dict[str, object]) -> None:
-        """Insert the object into repository"""
-        raise NotImplementedError("Subclasses must implement the insert_item method.")
+    # @abstractmethod
+    # def insert_item(self, item: dict[str, object]) -> None:
+    #     """Insert the object into repository"""
+    #     raise NotImplementedError("Subclasses must implement the insert_item method.")
 
     def _ingest_queue_name(self) -> str:
         """Return ingestion queue name.  Ingest raw source into embedding ready units"""
@@ -83,7 +87,6 @@ class KnowledgeService(ABC):
             for item in self.fetch_from_source():
                 if self._stop_event.is_set():
                     break
-                # TODO AR: store_item() is an abstract.  are we making this abstract too then?
                 self.emit_fetched_item(item)
                 self._stats.record_added()
         except Exception as e:
