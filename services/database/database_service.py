@@ -45,6 +45,4 @@ class QueryService():
 
         article_pid = self._repository.get_pid_by_title(title)
         full_chunks = self._repository.get_record_full_chunks_content(article_pid)
- 
         return full_chunks
-

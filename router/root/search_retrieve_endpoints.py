@@ -2,8 +2,6 @@
 Endpoints for interacting with the knowledge database.
 """
 from fastapi import APIRouter, Query
-
-from repository.model import DocumentRecord
 from services.database.database_service import QueryService
 
 router = APIRouter()
@@ -30,4 +28,3 @@ def retrieve_wiki_articles(
     """Get wiki article content"""
     print(f"(search_retrieve endpoints) Retrieving wiki articles for title: {title}")
     return _query_service.get_article_content_by_title(title)
-
