@@ -14,7 +14,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 
-logging.getLogger("router.knowledge.endpoints").setLevel(logging.DEBUG)
+logging.getLogger("router.knowledge.endpoints").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 
