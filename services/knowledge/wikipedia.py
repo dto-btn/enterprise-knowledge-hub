@@ -59,7 +59,7 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def __init__(self, queue_service, logger, repository: WikipediaPgRepository | None = None):
         super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
-        self._repository = repository or WikipediaPgRepository.from_env()
+        # self._repository = repository or WikipediaPgRepository.from_env()
         self._pending: list[WikipediaDbRecord] = []
 
     @property
@@ -159,7 +159,7 @@ class WikipediaKnowedgeService(KnowledgeService):
     def store_item(self, item: dict[str, object]) -> None:
         wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
         record_to_insert = WikipediaDbRecord.from_item(wiki_item)
-        self._repository.insert(record_to_insert.as_mapping())
+        # self._repository.insert(record_to_insert.as_mapping())
 
     def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]:
         """Process a single index file and yield WikipediaItems."""

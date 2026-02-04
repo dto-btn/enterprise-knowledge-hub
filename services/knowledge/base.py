@@ -34,14 +34,14 @@ class KnowledgeService(ABC):
         self._producer_done.clear()
         self._stop_event.clear()
         self._stats.reset()  # Reset stats at the start of each run
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             queue_future = executor.submit(self.ingest)
             process_future = executor.submit(self.process)
-            insert_future = executor.submit(self.store)
+            # insert_future = executor.submit(self.store)
             # Wait for both to complete and propagate any exceptions
             queue_future.result()
             process_future.result()
-            insert_future.result()
+            # insert_future.result()
 
     @abstractmethod
     def fetch_from_source(self) -> Iterator[KnowledgeItem]:
@@ -132,47 +132,47 @@ class KnowledgeService(ABC):
             self.logger.info("Done processing ingested data from queue: %s. (%s)", self._ingest_queue_name(),
                                                                                 self.service_name)
 
-    def store(self) -> None:
-        """
-            Process {service_name}.processed queue
-            Inserts into database
-        """
-        self.logger.info("Processing processed data from queue: %s. (%s)", self._processed_queue_name(),
-                                                                        self.service_name)
+    # def store(self) -> None:
+    #     """
+    #         Process {service_name}.processed queue
+    #         Inserts into database
+    #     """
+    #     self.logger.info("Processing processed data from queue: %s. (%s)", self._processed_queue_name(),
+    #                                                                     self.service_name)
 
-        worker = QueueWorker(
-            queue_service=self.queue_service,
-            logger=self.logger,
-            stop_event=self._stop_event,
-            poll_interval=self._poll_interval
-        )
+    #     worker = QueueWorker(
+    #         queue_service=self.queue_service,
+    #         logger=self.logger,
+    #         stop_event=self._stop_event,
+    #         poll_interval=self._poll_interval
+    #     )
 
-        def handler(item: dict[str, object]) -> None:
-            if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
-                self.store_item(item)
+    #     def handler(item: dict[str, object]) -> None:
+    #         if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
+    #             self.store_item(item)
 
-        def should_exit(drained_any: bool) -> bool:
-            #Producer done and ingestion queue empty AND queue was empty this iteration
-            return self._producer_done.is_set() and not drained_any
+    #     def should_exit(drained_any: bool) -> bool:
+    #         #Producer done and ingestion queue empty AND queue was empty this iteration
+    #         return self._producer_done.is_set() and not drained_any
 
-        try:
-            worker.run(
-                queue_name=self._processed_queue_name(),
-                service_name=self.service_name,
-                handler=handler,
-                should_exit=should_exit
-            )
-        except Exception:
-            self.logger.exception("Error during processing for queue: %s. (%s)", self._processed_queue_name(),
-                                                                            self.service_name)
-        finally:
-            try:
-                self.finalize_processing()
-            except Exception:
-                self.logger.exception("Error during finalize_processing for queue: %s. (%s)",
-                                                                        self._processed_queue_name(), self.service_name)
-            self.logger.info("Done processing ingested data from queue: %s. (%s)", self._processed_queue_name(),
-                                                                            self.service_name)
+    #     try:
+    #         worker.run(
+    #             queue_name=self._processed_queue_name(),
+    #             service_name=self.service_name,
+    #             handler=handler,
+    #             should_exit=should_exit
+    #         )
+    #     except Exception:
+    #         self.logger.exception("Error during processing for queue: %s. (%s)", self._processed_queue_name(),
+    #                                                                         self.service_name)
+    #     finally:
+    #         try:
+    #             self.finalize_processing()
+    #         except Exception:
+    #             self.logger.exception("Error during finalize_processing for queue: %s. (%s)",
+    #                                                                     self._processed_queue_name(), self.service_name)
+    #         self.logger.info("Done processing ingested data from queue: %s. (%s)", self._processed_queue_name(),
+    #                                                                         self.service_name)
 
     def finalize_processing(self) -> None:
         """Optional hook called after processing loop ends."""
