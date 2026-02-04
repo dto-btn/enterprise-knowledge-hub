@@ -3,6 +3,7 @@
 # pylint: disable=duplicate-code
 import logging
 import os
+import time
 
 import numpy as np
 import torch
@@ -45,7 +46,7 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
             dtype = torch.float32
 
         model_device = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps") if torch.backends.mps.is_available() else "auto" #pylint: disable=line-too-long
-
+        # model_device = "cpu"
         # Use flash_attention_2 only if flash-attn package is installed and CUDA is available
         attn_impl = "flash_attention_2" if _is_flash_attn_available() else None
         model_kwargs = {
@@ -64,8 +65,10 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if attn_impl:
             model_kwargs["attn_implementation"] = attn_impl
 
+        # model_path = "/home/ruana/all-MiniLM-L6-v2"
         self.model = SentenceTransformer(
             "Qwen/Qwen3-Embedding-0.6B",
+            # model_path,
             model_kwargs=model_kwargs,
             tokenizer_kwargs={"padding_side": "left"},
         )
@@ -90,9 +93,18 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if is_query:
             text = QWEN3_QUERY_INSTRUCTION + text
 
+
         chunks = self.chunk_text_by_tokens(text, max_tokens=self.model.max_seq_length)
         self.logger.debug("Split into %d chunks", len(chunks))
+        f = open("/home/randrew/output.txt", "a")
+        print("max seq len", file=f)
+        print(self.model.max_seq_length, file=f)
 
+        print("===============================================", file=f)
+        print("Chunks/Sec Counter", file=f)
+        
+        start = time.perf_counter()
+        
         # Encode the string chunks
         embeddings = self.model.encode(
             chunks,
@@ -102,6 +114,10 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
             batch_size=int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_BATCH_SIZE", "1")),
             truncate_dim=dim
         )
+        end = time.perf_counter() - start
+        chunks_per_sec = len(chunks) / end
+        print("Throughput: {chunks_per_sec} chunks/sec", file=f)
+        print("**********************************************", file=f)
 
         # Aggressive cleanup for MPS
         if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_CLEANUP", "False").lower() == "true":
