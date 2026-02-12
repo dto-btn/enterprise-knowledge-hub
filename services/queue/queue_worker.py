@@ -38,7 +38,7 @@ class QueueWorker:
                         self._acknowledge(delivery_tag, successful=False)
                         break
                     handler(item)
-                    self._acknowledge(delivery_tag, successful=True)
+                    self._acknowledge(delivery_tag, successful=False)
                 except Exception as e:
                     self.logger.exception(
                         "Error processing item in queue %s - %s", queue_name, service_name

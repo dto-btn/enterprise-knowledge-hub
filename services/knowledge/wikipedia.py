@@ -70,45 +70,46 @@ class WikipediaKnowedgeService(KnowledgeService):
     def process_item(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""
         try:
-            item = WikipediaItem.from_dict(knowledge_item)
-            self.logger.debug("Generating embeddings for %s", item.title)
+            # item = WikipediaItem.from_dict(knowledge_item)
+            # self.logger.debug("Generating embeddings for %s", item.title)
 
-            max_tokens = getattr(self.embedder, "max_seq_length", None)
-            if max_tokens is None:
-                max_tokens = getattr(getattr(self.embedder, "model", None), "max_seq_length", None)
+            # max_tokens = getattr(self.embedder, "max_seq_length", None)
+            # if max_tokens is None:
+            #     max_tokens = getattr(getattr(self.embedder, "model", None), "max_seq_length", None)
 
-            chunks = self.embedder.chunk_text_by_tokens(item.content, max_tokens=max_tokens)
-            embeddings = self.embedder.embed(item.content)
+            # chunks = self.embedder.chunk_text_by_tokens(item.content, max_tokens=max_tokens)
+            # embeddings = self.embedder.embed(item.content)
 
-            arr = np.asarray(embeddings)
-            if arr.ndim == 1:
-                arr = arr.reshape(1, -1)
+            # arr = np.asarray(embeddings)
+            # if arr.ndim == 1:
+            #     arr = arr.reshape(1, -1)
 
-            num_chunks = arr.shape[0]
-            if num_chunks != len(chunks):
-                self.logger.warning("Chunk/text count mismatch: embeddings=%d, chunks=%d", num_chunks, len(chunks))
-                limit = min(num_chunks, len(chunks))
-                arr = arr[:limit]
-                chunks = chunks[:limit]
-                num_chunks = limit
+            # num_chunks = arr.shape[0]
+            # if num_chunks != len(chunks):
+            #     self.logger.warning("Chunk/text count mismatch: embeddings=%d, chunks=%d", num_chunks, len(chunks))
+            #     limit = min(num_chunks, len(chunks))
+            #     arr = arr[:limit]
+            #     chunks = chunks[:limit]
+            #     num_chunks = limit
 
-            results: list[DatabaseWikipediaItem] = []
-            for idx, (chunk_text, vec) in enumerate(zip(chunks, arr), start=1):
-                results.append(
-                    DatabaseWikipediaItem(
-                        name=item.name,
-                        title=f"{item.title} (chunk {idx}/{num_chunks})",
-                        content=chunk_text,
-                        last_modified_date=item.last_modified_date,
-                        pid=item.pid,
-                        chunk_index=idx,
-                        chunk_count=num_chunks,
-                        source=item.source,
-                        embeddings=vec,
-                    )
-                )
+            # results: list[DatabaseWikipediaItem] = []
+            # for idx, (chunk_text, vec) in enumerate(zip(chunks, arr), start=1):
+            #     results.append(
+            #         DatabaseWikipediaItem(
+            #             name=item.name,
+            #             title=f"{item.title} (chunk {idx}/{num_chunks})",
+            #             content=chunk_text,
+            #             last_modified_date=item.last_modified_date,
+            #             pid=item.pid,
+            #             chunk_index=idx,
+            #             chunk_count=num_chunks,
+            #             source=item.source,
+            #             embeddings=vec,
+            #         )
+            #     )
+            print("hello")
 
-            return results
+            # return results
         except Exception as e:
             self.logger.error("Error processing embedding for Wikipedia item: %s", e)
             raise e
@@ -150,7 +151,6 @@ class WikipediaKnowedgeService(KnowledgeService):
                         source=item.source
                     )
                 )
-        
         for wikiItem in results:
             self.queue_service.write(self._ingest_queue_name(), wikiItem.to_dict())
         

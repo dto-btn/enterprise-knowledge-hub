@@ -44,7 +44,8 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if torch.backends.mps.is_available():
             dtype = torch.float32
 
-        model_device = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps") if torch.backends.mps.is_available() else "auto" #pylint: disable=line-too-long
+        model_device = "cpu"
+        # model_device = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps") if torch.backends.mps.is_available() else "auto" #pylint: disable=line-too-long
 
         # Use flash_attention_2 only if flash-attn package is installed and CUDA is available
         attn_impl = "flash_attention_2" if _is_flash_attn_available() else None
@@ -64,8 +65,10 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if attn_impl:
             model_kwargs["attn_implementation"] = attn_impl
 
+        modeltest="/home/ruana/all-MiniLM-L6-v2"
         self.model = SentenceTransformer(
-            "Qwen/Qwen3-Embedding-0.6B",
+            # "Qwen/Qwen3-Embedding-0.6B",
+            modeltest,
             model_kwargs=model_kwargs,
             tokenizer_kwargs={"padding_side": "left"},
         )
