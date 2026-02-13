@@ -126,7 +126,7 @@ class WikipediaPgRepository:
         insert_sql = sql.SQL(
             """
             INSERT INTO {table} (pid, chunk_index, name, title, content, last_modified_date, embedding, source)
-            VALUES (%(pid)s, %(chunk_index)s, %(name)s, %(title)s, %(content)s, 
+            VALUES (%(pid)s, %(chunk_index)s, %(name)s, %(title)s, %(content)s,
                 %(last_modified_date)s, %(embedding)s, %(source)s)
             ON CONFLICT (pid, chunk_index) DO UPDATE SET
                 name = EXCLUDED.name,
@@ -239,6 +239,35 @@ class WikipediaPgRepository:
             cur.execute(query_sql, (pattern,))
             rows = cur.fetchall()
         return rows
+
+    def update_history_table_start(self, time, title: str) -> None:
+        """Update the history table with the last modified date and title."""
+
+        query_sql = sql.SQL(
+            """
+            INSERT INTO run_history (start_time, file_name)
+            VALUES (%s, %s)
+            """
+        )
+
+        with self._pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(query_sql, (time, title))
+            conn.commit()
+
+    def update_history_table_end(self, time, title: str) -> None:
+        """Update the history table with the end date based on title."""
+
+        query_sql = sql.SQL(
+            """
+            UPDATE run_history
+            SET end_time = %s
+            WHERE file_name = %s
+            """
+        )
+
+        with self._pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(query_sql, (time, title))
+            conn.commit()
 
     def close(self) -> None:
         """Close the underlying connection pool."""

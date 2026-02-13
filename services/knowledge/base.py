@@ -38,7 +38,7 @@ class KnowledgeService(ABC):
             queue_future = executor.submit(self.ingest)
             process_future = executor.submit(self.process)
             insert_future = executor.submit(self.store)
-            # Wait for both to complete and propagate any exceptions
+            # Wait for completion and propagate any exceptions
             queue_future.result()
             process_future.result()
             insert_future.result()

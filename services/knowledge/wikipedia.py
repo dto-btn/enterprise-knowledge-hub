@@ -70,6 +70,7 @@ class WikipediaKnowedgeService(KnowledgeService):
     def process_item(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""
         try:
+            print(f"Processing item: {knowledge_item.get('title', 'unknown_title')}")
             item = WikipediaItem.from_dict(knowledge_item)
             self.logger.debug("Generating embeddings for %s", item.title)
 
@@ -78,7 +79,9 @@ class WikipediaKnowedgeService(KnowledgeService):
                 max_tokens = getattr(getattr(self.embedder, "model", None), "max_seq_length", None)
 
             chunks = self.embedder.chunk_text_by_tokens(item.content, max_tokens=max_tokens)
-            embeddings = self.embedder.embed(item.content)
+            # PLACEHOLDER for actual embedding generation, which should be done in batches for efficiency. For now, we just generate dummy embeddings.
+            embeddings = [np.random.rand(512).tolist() for _ in chunks]
+            # embeddings = self.embedder.embed(item.content)
 
             arr = np.asarray(embeddings)
             if arr.ndim == 1:
@@ -119,7 +122,9 @@ class WikipediaKnowedgeService(KnowledgeService):
             The content will be first entrypoint in the main .bz2 multistream file.
                 Ex: 345:6789:Fruits (Read more on the doc from the README.md from content/ folder)
         """
+        print(f"Looking for index files in {self._content_folder_path}")
         for index_path in self._discover_index_files():
+            print(f"Found index file: {index_path}")
             self.logger.info("Reading data from Wikipedia source: %s", index_path)
 
             dump_path = self._get_dump_path(index_path)
@@ -146,6 +151,11 @@ class WikipediaKnowedgeService(KnowledgeService):
         dump_name = f"{prefix}{chunk if chunk else ''}.xml.bz2"
         dump_path = index_path.with_name(dump_name)
 
+        # print(f"dump_name: {dump_name}")
+        # print(f"dump_path: {dump_path}")
+        # now = datetime.now()
+        # self._repository.update_history_table_start(now, dump_name)
+
         if not dump_path.exists():
             self.logger.warning("Dump file not found: %s", dump_path)
             return None
@@ -157,9 +167,11 @@ class WikipediaKnowedgeService(KnowledgeService):
         self.queue_service.write(self._processed_queue_name(), queue_item)
 
     def store_item(self, item: dict[str, object]) -> None:
+        print(f"Storing item: {item.get('title', 'unknown_title')}")
         wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
         record_to_insert = WikipediaDbRecord.from_item(wiki_item)
         self._repository.insert(record_to_insert.as_mapping())
+        print(f"Finished storing item: {item.get('title', 'unknown_title')}")
 
     def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]:
         """Process a single index file and yield WikipediaItems."""
@@ -173,24 +185,36 @@ class WikipediaKnowedgeService(KnowledgeService):
         source_name = index_path.name .split("-")[0]
         source = Source.WIKIPEDIA_EN if source_name == "enwiki" else Source.WIKIPEDIA_FR if source_name == "frwiki" else None #pylint: disable=line-too-long
 
+        print(f"Processing index file: {index_path} with dump file: {dump_path} (source: {source})")
+        now = datetime.now()
+        self._repository.update_history_table_start(now, dump_path.name)
+
         with open(dump_path, 'rb') as dump_file, bz2.open(index_path, mode='rt') as index_file:
             for line in index_file:
+                # print(f"Processing line {current_line} in index file {index_path}")
                 current_line += 1
                 offset = self._parse_line_offset(line, current_line, index_path.name)
                 if offset is None:
+                    # print(f"Skipping malformed line {current_line} in {index_path.name}")
                     continue
 
                 # Skip already processed lines
                 if current_line <= start_line:
+                    # print(f"Skipping already processed line {current_line} in {index_path.name}")
                     prev_offset = offset
                     continue
 
                 yield from self._process_chunk(dump_file, dump_path.name, prev_offset, offset, source)
+                # print(f"Finished processing chunk at line {current_line} in index file {index_path}")
                 prev_offset = offset
 
                 if current_line % self._progress_flush_interval == 0:
+                    print("flushing progress to disk at line %d for index file %s", current_line, index_path.name)
                     self._save_progress(index_path, current_line)
+                # else:
+                #     print(f"Processed line {current_line} in index file {index_path} (not yet flushed to progress file)")
 
+        print(f"Completed processing index file: {index_path} at line {current_line}")
         self._save_progress(index_path, current_line)
         self.logger.info("Completed %s at line %d", index_path.name, current_line)
 
@@ -229,6 +253,7 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def _extract_pages_from_xml(self, xml_content: str, source: Source | None) -> Iterator[WikipediaItem]:
         """Extract and parse all pages from XML content."""
+        print(f"Extracting pages from XML content (source: {source})")
         for page_match in re.finditer(r"<page>(.*?)</page>", xml_content, re.DOTALL):
             page_xml = page_match.group(0)
 
@@ -269,6 +294,7 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def _discover_index_files(self) -> Iterator[Path]:
         """Discover index files in the content folder."""
+        print(f"Searching for index files in ---> {self._content_folder_path}")
         self.logger.debug("Searching for index files in ---> %s", self._content_folder_path)
         for node in sorted(self._content_folder_path.rglob("*.txt.bz2")):
             if not node.is_file():
@@ -315,7 +341,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         text_match = re.search(r"<text[^>]*>([^<]*(?:<(?!/text>)[^<]*)*)</text>", xml_page, re.DOTALL)
         content = text_match.group(1) if text_match else ""
 
-        # REMOVE WIKI MARKUP (note: one of those 2 methods might be faster than the other?? they yeild the same results)
+        # REMOVE WIKI MARKUP (note: one of those 2 methods might be faster than the other?? they yield the same results)
         content = remove_markup(content)
         #content = parse(content).plain_text()
 
