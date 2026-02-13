@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.cuda
 from dotenv import load_dotenv
+from typing import List
 from sentence_transformers import SentenceTransformer
 
 from provider.embedding.base import EmbeddingBackendProvider, QWEN3_QUERY_INSTRUCTION
@@ -78,7 +79,7 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
 
     def embed(
         self,
-        text: str,
+        text: List[str],
         is_query: bool = False,
         dim: int = int(os.getenv("WIKIPEDIA_EMBEDDING_MAX_DIMENSION", "1024")),
     ) -> np.ndarray:
@@ -93,12 +94,12 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if is_query:
             text = QWEN3_QUERY_INSTRUCTION + text
 
-        chunks = self.chunk_text_by_tokens(text, max_tokens=self.model.max_seq_length)
-        self.logger.debug("Split into %d chunks", len(chunks))
+        # chunks = self.chunk_text_by_tokens(text, max_tokens=self.model.max_seq_length)
+        # self.logger.debug("Split into %d chunks", len(chunks))
 
         # Encode the string chunks
         embeddings = self.model.encode(
-            chunks,
+            text,
             convert_to_tensor=False,
             show_progress_bar=bool(os.getenv("MODEL_SHOW_PROGRESS", "True").lower() == "true"),
             # Lower batch size for potentially large chunks
