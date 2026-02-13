@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.cuda
 from dotenv import load_dotenv
+from typing import List
 from sentence_transformers import SentenceTransformer
 
 from provider.embedding.base import EmbeddingBackendProvider, QWEN3_QUERY_INSTRUCTION
@@ -44,7 +45,8 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if torch.backends.mps.is_available():
             dtype = torch.float32
 
-        model_device = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps") if torch.backends.mps.is_available() else "auto" #pylint: disable=line-too-long
+        model_device = "cpu"
+        # model_device = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps") if torch.backends.mps.is_available() else "auto" #pylint: disable=line-too-long
 
         # Use flash_attention_2 only if flash-attn package is installed and CUDA is available
         attn_impl = "flash_attention_2" if _is_flash_attn_available() else None
@@ -64,8 +66,10 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if attn_impl:
             model_kwargs["attn_implementation"] = attn_impl
 
+        modeltest="/home/ruana/all-MiniLM-L6-v2"
         self.model = SentenceTransformer(
-            "Qwen/Qwen3-Embedding-0.6B",
+            # "Qwen/Qwen3-Embedding-0.6B",
+            modeltest,
             model_kwargs=model_kwargs,
             tokenizer_kwargs={"padding_side": "left"},
         )
@@ -75,7 +79,7 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
 
     def embed(
         self,
-        text: str,
+        text: List[str],
         is_query: bool = False,
         dim: int = int(os.getenv("WIKIPEDIA_EMBEDDING_MAX_DIMENSION", "1024")),
     ) -> np.ndarray:
@@ -90,12 +94,12 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         if is_query:
             text = QWEN3_QUERY_INSTRUCTION + text
 
-        chunks = self.chunk_text_by_tokens(text, max_tokens=self.model.max_seq_length)
-        self.logger.debug("Split into %d chunks", len(chunks))
+        # chunks = self.chunk_text_by_tokens(text, max_tokens=self.model.max_seq_length)
+        # self.logger.debug("Split into %d chunks", len(chunks))
 
         # Encode the string chunks
         embeddings = self.model.encode(
-            chunks,
+            text,
             convert_to_tensor=False,
             show_progress_bar=bool(os.getenv("MODEL_SHOW_PROGRESS", "True").lower() == "true"),
             # Lower batch size for potentially large chunks

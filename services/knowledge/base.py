@@ -4,12 +4,16 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
+from typing import TypeVar, Any
 import logging
 import threading
 from services.knowledge.models import KnowledgeItem
+from services.knowledge.batch_handler import BatchHandler
 from services.queue.queue_worker import QueueWorker
 from services.queue.queue_service import QueueService
 from services.stats.knowledge_service_stats import KnowledgeServiceStats
+
+T = TypeVar("T")
 
 @dataclass
 class KnowledgeService(ABC):
@@ -34,14 +38,14 @@ class KnowledgeService(ABC):
         self._producer_done.clear()
         self._stop_event.clear()
         self._stats.reset()  # Reset stats at the start of each run
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            queue_future = executor.submit(self.ingest)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # queue_future = executor.submit(self.ingest)
             process_future = executor.submit(self.process)
-            insert_future = executor.submit(self.store)
+            # insert_future = executor.submit(self.store)
             # Wait for both to complete and propagate any exceptions
-            queue_future.result()
+            # queue_future.result()
             process_future.result()
-            insert_future.result()
+            # insert_future.result()
 
     @abstractmethod
     def fetch_from_source(self) -> Iterator[KnowledgeItem]:
@@ -54,7 +58,7 @@ class KnowledgeService(ABC):
         raise NotImplementedError("Subclasses must implement the emit_fetched_item method.")
 
     @abstractmethod
-    def process_item(self, knowledge_item: dict[str, object]):
+    def process_item(self, knowledge_item: Any):
         """Process ingested data from the queue. May return a single item or a list of items."""
         raise NotImplementedError("Subclasses must implement the process_item method.")
 
@@ -67,6 +71,11 @@ class KnowledgeService(ABC):
     def store_item(self, item: dict[str, object]) -> None:
         """Insert the object into repository"""
         raise NotImplementedError("Subclasses must implement the store_item method.")
+    
+    @abstractmethod
+    def get_batch_size(self) -> int:
+        """Get the set batch size"""
+        raise NotImplementedError("Subclasses must implement the get_batch_size method.")
 
     def _ingest_queue_name(self) -> str:
         """Return ingestion queue name.  Ingest raw source into embedding ready units"""
@@ -95,6 +104,7 @@ class KnowledgeService(ABC):
         """Process ingested data. Keeps polling until producer is done and queue is empty."""
         self.logger.info("Processing ingested data from queue: %s. (%s)", self._ingest_queue_name(), self.service_name)
 
+        batch_size = self.get_batch_size()
         worker = QueueWorker(
             queue_service=self.queue_service,
             logger=self.logger,
@@ -102,12 +112,17 @@ class KnowledgeService(ABC):
             poll_interval=self._poll_interval
         )
 
-        def handler(item: dict[str, object]) -> None:
-            processed = self.process_item(item) # GPU work happens here
-            processed_items: list[KnowledgeItem] = processed if isinstance(processed, list) else [processed]
-            for processed_item in processed_items:
-                self.emit_processed_item(processed_item)
-            self._stats.record_processed()
+        def acknowledge(delivery_tag, successful):
+            print("ack definition" + str(successful))
+            self.queue_service.read_ack(delivery_tag, successful)
+            
+        handler = BatchHandler(self.process_item, acknowledge, batch_size)
+        # def handler(item: dict[str, object]) -> None:
+        #     processed = self.process_item(item) # GPU work happens here
+        #     processed_items: list[KnowledgeItem] = processed if isinstance(processed, list) else [processed]
+        #     for processed_item in processed_items:
+        #         self.emit_processed_item(processed_item)
+        #     self._stats.record_processed()
 
         def should_exit(drained_any: bool) -> bool:
             #Producer done and ingestion queue empty AND queue was empty this iteration
