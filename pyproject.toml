@@ -21,7 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # CUDA-specific dependencies that require NVIDIA GPU and CUDA toolkit
-cuda = [
+flash = [
     "flash-attn>=2.8.3",
 ]
 
