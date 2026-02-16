@@ -1,9 +1,14 @@
-FROM nvidia/cuda:12.9.1-cudnn-devel-ubuntu24.04
-#FROM python:3.12.12-trixie
+# Build args must be declared before FROM to use in image selection
+ARG ENABLE_CUDA=false
+ARG CUDA_ARCH
 
-# For local dev:  docker build --build-arg UV_ARGS="--extra flash" --build-arg CUDA_ARCH="8.6" -t ekh:local-8.6 .
-ARG UV_ARGS
-# CUDA compute capabilities - see: https://developer.nvidia.com/cuda-gpus (use version found there for your GPU)
+# Select base image based on CUDA flag
+FROM nvidia/cuda:12.9.1-cudnn-devel-ubuntu24.04 AS base-cuda
+FROM python:3.12-trixie AS base-cpu
+FROM base-${ENABLE_CUDA:+cuda}${ENABLE_CUDA:-cpu} AS base
+
+# For local dev:  docker build --build-arg ENABLE_CUDA=true --build-arg CUDA_ARCH="8.6" -t ekh:local-8.6 .
+ARG ENABLE_CUDA
 ARG CUDA_ARCH
 
 # install uv (from https://docs.astral.sh/uv/guides/integration/docker/#installing-uv)
@@ -19,20 +24,25 @@ RUN sh /uv-installer.sh && rm /uv-installer.sh
 
 # Ensure the installed binary is on the `PATH`
 ENV UV_NO_DEV=1
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH="/root/.local/bin/:$CUDA_HOME/bin:$PATH"
+ENV PATH="/root/.local/bin/:$PATH"
 
+# CUDA-specific environment variables (only set when CUDA is enabled)
 # flash-attn build configuration (see: https://github.com/Dao-AILab/flash-attention)
 # MAX_JOBS: Limit parallel ninja jobs to avoid OOM during compilation
 # NVCC_THREADS: Limit nvcc threads per job
 # TORCH_CUDA_ARCH_LIST: Target GPU architectures (used by PyTorch cpp_extension)
-ENV MAX_JOBS=4
-ENV NVCC_THREADS=2
-ENV TORCH_CUDA_ARCH_LIST=${CUDA_ARCH}
+RUN if [ "$ENABLE_CUDA" = "true" ]; then \
+      echo "CUDA_HOME=/usr/local/cuda" >> /etc/environment && \
+      echo "MAX_JOBS=4" >> /etc/environment && \
+      echo "NVCC_THREADS=2" >> /etc/environment && \
+      echo "TORCH_CUDA_ARCH_LIST=${CUDA_ARCH}" >> /etc/environment && \
+      echo "FLASH_ATTENTION_FORCE_BUILD=TRUE" >> /etc/environment && \
+      echo "FLASH_ATTENTION_FORCE_CXX11_ABI=FALSE" >> /etc/environment && \
+      echo "FLASH_ATTENTION_SKIP_CUDA_BUILD=FALSE" >> /etc/environment; \
+    fi
 
-ENV FLASH_ATTENTION_FORCE_BUILD="TRUE"
-ENV FLASH_ATTENTION_FORCE_CXX11_ABI="FALSE"
-ENV FLASH_ATTENTION_SKIP_CUDA_BUILD="FALSE"
+ENV CUDA_HOME=${ENABLE_CUDA:+/usr/local/cuda}
+ENV PATH="${CUDA_HOME:+$CUDA_HOME/bin:}$PATH"
 
 WORKDIR /app
 
@@ -44,11 +54,20 @@ COPY services ./services
 
 COPY pyproject.toml uv.lock ./
 
-# need extra work for llama_cpp stuff. see pyproject.toml for details.
+# Build with or without flash-attn based on CUDA flag
 # FLASH_ATTN_CUDA_ARCHS needs shell expansion, so compute it inline
-RUN FLASH_ATTN_CUDA_ARCHS="$(echo ${CUDA_ARCH} | tr -d '.')" uv sync $UV_ARGS --locked
-
-# ENV VIRTUAL_ENV=/app/.venv \
-# 	PATH=/app/.venv/bin:$PATH
+RUN if [ "$ENABLE_CUDA" = "true" ]; then \
+      export CUDA_HOME=/usr/local/cuda && \
+      export MAX_JOBS=4 && \
+      export NVCC_THREADS=2 && \
+      export TORCH_CUDA_ARCH_LIST="${CUDA_ARCH}" && \
+      export FLASH_ATTENTION_FORCE_BUILD="TRUE" && \
+      export FLASH_ATTENTION_FORCE_CXX11_ABI="FALSE" && \
+      export FLASH_ATTENTION_SKIP_CUDA_BUILD="FALSE" && \
+      export FLASH_ATTN_CUDA_ARCHS="$(echo ${CUDA_ARCH} | tr -d '.')" && \
+      uv sync --extra flash --locked; \
+    else \
+      uv sync --locked; \
+    fi
 
 CMD ["uv", "run", "fastapi", "run", "main.py"]

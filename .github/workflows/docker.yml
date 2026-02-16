@@ -48,7 +48,7 @@ jobs:
         run: |
           if [[ "${{ inputs.enable_cuda }}" == "true" ]]; then
             docker build \
-              --build-arg UV_ARGS="--extra flash" \
+              --build-arg ENABLE_CUDA=true \
               --build-arg CUDA_ARCH="${{ inputs.cuda_arch }}" \
               -t ${{ steps.tag.outputs.tag }} .
           else
