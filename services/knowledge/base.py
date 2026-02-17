@@ -165,6 +165,7 @@ class KnowledgeService(ABC):
         except Exception:
             self.logger.exception("Error during processing for queue: %s. (%s)", self._processed_queue_name(),
                                                                             self.service_name)
+
         finally:
             try:
                 self.finalize_processing()
@@ -173,7 +174,6 @@ class KnowledgeService(ABC):
                                                                         self._processed_queue_name(), self.service_name)
             self.logger.info("Done processing ingested data from queue: %s. (%s)", self._processed_queue_name(),
                                                                             self.service_name)
-
     def finalize_processing(self) -> None:
         """Optional hook called after processing loop ends."""
         self._is_ingestion_queue_complete = True

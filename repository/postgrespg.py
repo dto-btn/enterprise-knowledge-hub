@@ -240,33 +240,36 @@ class WikipediaPgRepository:
             rows = cur.fetchall()
         return rows
 
-    def update_history_table_start(self, time, title: str) -> None:
+    def update_history_table_start(self, time, title: str):
         """Update the history table with the last modified date and title."""
 
         query_sql = sql.SQL(
             """
             INSERT INTO run_history (start_time, file_name)
             VALUES (%s, %s)
+            RETURNING id
             """
         )
 
         with self._pool.connection() as conn, conn.cursor() as cur:
             cur.execute(query_sql, (time, title))
+            result = cur.fetchone()[0]
             conn.commit()
+            return result
 
-    def update_history_table_end(self, time, title: str) -> None:
+    def update_history_table_end(self, time, id: int) -> None:
         """Update the history table with the end date based on title."""
 
         query_sql = sql.SQL(
             """
             UPDATE run_history
             SET end_time = %s
-            WHERE file_name = %s
+            WHERE id = %s
             """
         )
 
         with self._pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(query_sql, (time, title))
+            cur.execute(query_sql, (time, id))
             conn.commit()
 
     def close(self) -> None:

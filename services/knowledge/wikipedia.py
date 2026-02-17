@@ -70,7 +70,7 @@ class WikipediaKnowedgeService(KnowledgeService):
     def process_item(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""
         try:
-            print(f"Processing item: {knowledge_item.get('title', 'unknown_title')}")
+            # print(f"Processing item: {knowledge_item.get('title', 'unknown_title')}")
             item = WikipediaItem.from_dict(knowledge_item)
             self.logger.debug("Generating embeddings for %s", item.title)
 
@@ -171,7 +171,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
         record_to_insert = WikipediaDbRecord.from_item(wiki_item)
         self._repository.insert(record_to_insert.as_mapping())
-        print(f"Finished storing item: {item.get('title', 'unknown_title')}")
+        # print(f"Finished storing item: {item.get('title', 'unknown_title')}")
 
     def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]:
         """Process a single index file and yield WikipediaItems."""
@@ -187,7 +187,7 @@ class WikipediaKnowedgeService(KnowledgeService):
 
         print(f"Processing index file: {index_path} with dump file: {dump_path} (source: {source})")
         now = datetime.now()
-        self._repository.update_history_table_start(now, dump_path.name)
+        id = self._repository.update_history_table_start(now, dump_path.name)
 
         with open(dump_path, 'rb') as dump_file, bz2.open(index_path, mode='rt') as index_file:
             for line in index_file:
@@ -217,6 +217,8 @@ class WikipediaKnowedgeService(KnowledgeService):
         print(f"Completed processing index file: {index_path} at line {current_line}")
         self._save_progress(index_path, current_line)
         self.logger.info("Completed %s at line %d", index_path.name, current_line)
+
+        self._repository.update_history_table_end(datetime.now(), id)
 
     def _parse_line_offset(self, line: str, line_num: int, filename: str) -> int | None:
         """Parse the byte offset from an index line. Returns None if malformed."""
