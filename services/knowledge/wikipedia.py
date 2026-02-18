@@ -11,17 +11,19 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-
 from dotenv import load_dotenv
-from services.knowledge.base import KnowledgeService
-from services.knowledge.models import DatabaseWikipediaItem, WikipediaItem
-from services.db.postgrespg import WikipediaDbRecord, WikipediaPgRepository
+from wikitextparser import remove_markup
+
 from provider.embedding.qwen3.embedder_factory import get_embedder
+from repository.postgrespg import WikipediaDbRecord, WikipediaPgRepository
+from services.knowledge.base import KnowledgeService
+from services.knowledge.models import DatabaseWikipediaItem, Source, WikipediaItem
 
 load_dotenv()
 
 PROGRESS_SUFFIX: str = ".progress"
 INDEX_FILENAME = re.compile(r"(?P<prefix>.+)-index(?P<chunk>\d*)\.txt\.bz2")
+QUEUE_BATCH_NAME = "wikipedia_embeddings_sink"
 
 @dataclass
 class WikipediaKnowedgeService(KnowledgeService):
@@ -36,7 +38,16 @@ class WikipediaKnowedgeService(KnowledgeService):
             "Catégorie:",
             "Fichier:",
             "Wikipédia:",
-            "Portal:"
+            "Portal:",
+            "Portail:",
+            "Template:",
+            "Modèle:",
+            "Help:",
+            "Aide:",
+            "User:",
+            "Utilisateur:",
+            "Project:",
+            "Projet:",
         )
 
     _content_folder_path: Path = Path(os.getenv("WIKIPEDIA_CONTENT_FOLDER",
@@ -44,6 +55,7 @@ class WikipediaKnowedgeService(KnowledgeService):
     _process_only_first_n_paragraphs: int = int(os.getenv("WIKIPEDIA_PROCESS_ONLY_FIRST_N_PARAGRAPHS", "0"))
     _progress_flush_interval: int = 1000 # for the .progress file we track line number we stpped.
     _batch_size: int = int(os.getenv("POSTGRES_BATCH_SIZE", "500"))
+    _debug_extraction: bool = os.getenv("DEBUG_EXTRACTION", "false").lower() in ("1", "true", "yes")
 
     def __init__(self, queue_service, logger, repository: WikipediaPgRepository | None = None):
         super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
@@ -55,7 +67,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         """Get embedder"""
         return get_embedder()
 
-    def process_queue(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
+    def process_item(self, knowledge_item: dict[str, object]) -> list[DatabaseWikipediaItem]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""
         try:
             item = WikipediaItem.from_dict(knowledge_item)
@@ -91,6 +103,7 @@ class WikipediaKnowedgeService(KnowledgeService):
                         pid=item.pid,
                         chunk_index=idx,
                         chunk_count=num_chunks,
+                        source=item.source,
                         embeddings=vec,
                     )
                 )
@@ -119,6 +132,9 @@ class WikipediaKnowedgeService(KnowledgeService):
                 self.logger.error("Failed to process index file %s: %s. Continuing to next file.", index_path, exc)
                 continue
 
+    def emit_fetched_item(self, item) -> None:
+        self.queue_service.write(self._ingest_queue_name(), item.to_dict())
+
     def _get_dump_path(self, index_path: Path) -> Path | None:
         """Derive the dump file path from an index file path."""
         match = INDEX_FILENAME.match(index_path.name)
@@ -136,22 +152,14 @@ class WikipediaKnowedgeService(KnowledgeService):
 
         return dump_path
 
-    def store_item(self, item: DatabaseWikipediaItem) -> None:
-        """Store the processed knowledge item into the knowledge base."""
-        record = WikipediaDbRecord.from_item(item)
-        self._pending.append(record)
-        if len(self._pending) >= self._batch_size:
-            self.logger.debug("Flushing %d pending records to the database", len(self._pending))
-            self._flush_pending()
+    def emit_processed_item(self, item: DatabaseWikipediaItem) -> None:
+        queue_item = item.to_dict()
+        self.queue_service.write(self._processed_queue_name(), queue_item)
 
-    def finalize_processing(self) -> None:
-        self._flush_pending()
-
-    def _flush_pending(self) -> None:
-        if not self._pending:
-            return
-        self._repository.insert_many(self._pending)
-        self._pending.clear()
+    def store_item(self, item: dict[str, object]) -> None:
+        wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
+        record_to_insert = WikipediaDbRecord.from_item(wiki_item)
+        self._repository.insert(record_to_insert.as_mapping())
 
     def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]:
         """Process a single index file and yield WikipediaItems."""
@@ -161,6 +169,9 @@ class WikipediaKnowedgeService(KnowledgeService):
 
         current_line = 0
         prev_offset: int | None = None
+
+        source_name = index_path.name .split("-")[0]
+        source = Source.WIKIPEDIA_EN if source_name == "enwiki" else Source.WIKIPEDIA_FR if source_name == "frwiki" else None #pylint: disable=line-too-long
 
         with open(dump_path, 'rb') as dump_file, bz2.open(index_path, mode='rt') as index_file:
             for line in index_file:
@@ -174,7 +185,7 @@ class WikipediaKnowedgeService(KnowledgeService):
                     prev_offset = offset
                     continue
 
-                yield from self._process_chunk(dump_file, dump_path.name, prev_offset, offset)
+                yield from self._process_chunk(dump_file, dump_path.name, prev_offset, offset, source)
                 prev_offset = offset
 
                 if current_line % self._progress_flush_interval == 0:
@@ -192,8 +203,8 @@ class WikipediaKnowedgeService(KnowledgeService):
             self.logger.warning("Skipping malformed line %d in %s", line_num, filename)
             return None
 
-    def _process_chunk(
-        self, dump_file, dump_name: str, prev_offset: int | None, offset: int
+    def _process_chunk( #pylint: disable=too-many-arguments,too-many-positional-arguments
+        self, dump_file, dump_name: str, prev_offset: int | None, offset: int, source: Source | None
     ) -> Iterator[WikipediaItem]:
         """Decompress and parse a chunk of the dump file."""
         if prev_offset is None:
@@ -209,20 +220,36 @@ class WikipediaKnowedgeService(KnowledgeService):
         try:
             decompressed = bz2.decompress(data)
             xml_content = decompressed.decode("utf-8", errors="ignore")
-            yield from self._extract_pages_from_xml(xml_content)
+            yield from self._extract_pages_from_xml(xml_content, source)
         except OSError as exc:
             self.logger.error(
                 "Failed to decompress chunk from %s between offsets %s and %s: %s",
                 dump_name, prev_offset, offset, exc
             )
 
-    def _extract_pages_from_xml(self, xml_content: str) -> Iterator[WikipediaItem]:
+    def _extract_pages_from_xml(self, xml_content: str, source: Source | None) -> Iterator[WikipediaItem]:
         """Extract and parse all pages from XML content."""
         for page_match in re.finditer(r"<page>(.*?)</page>", xml_content, re.DOTALL):
             page_xml = page_match.group(0)
+
+            # optional write to disk for debug purposes
+            if self._debug_extraction:
+                try:
+                    title_match = re.search(r"<title>([^<]+)</title>", page_xml)
+                    title = title_match.group(1) if title_match else "unknown_title"
+                    safe_title = re.sub(r'[\\/:"*?<>|]+', '_', title)  # Sanitize filename
+                    debug_path = self._content_folder_path / "debug_extracted_pages"
+                    debug_path.mkdir(parents=True, exist_ok=True)
+                    file_path = debug_path / f"{safe_title}.xml"
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(page_xml)
+                except Exception as exc:
+                    self.logger.debug("Failed to write extracted page xml: %s", exc)
+
             if not self._should_ignore_page(page_xml):
                 item = self._parse_page_xml(page_xml)
                 if item:
+                    item.source = source
                     yield item
 
     def _save_progress(self, index_path: Path, line_number: int) -> None:
@@ -257,8 +284,15 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def _should_ignore_page(self, xml_page: str) -> bool:
         """Check if a page should be ignored based on title or type."""
+
+        #Namespace detection: https://en.wikipedia.org/wiki/Wikipedia:Namespace
+        if not re.search(r"<ns>0</ns>", xml_page):
+            return True
+
         if re.search(r"<redirect\s", xml_page):
             return True
+
+        # last resort, extra title checking
         title_match = re.search(r"<title>([^<]+)</title>", xml_page)
         if title_match:
             title = title_match.group(1)
@@ -280,6 +314,10 @@ class WikipediaKnowedgeService(KnowledgeService):
         # Extract content (wiki markup text)
         text_match = re.search(r"<text[^>]*>([^<]*(?:<(?!/text>)[^<]*)*)</text>", xml_page, re.DOTALL)
         content = text_match.group(1) if text_match else ""
+
+        # REMOVE WIKI MARKUP (note: one of those 2 methods might be faster than the other?? they yeild the same results)
+        content = remove_markup(content)
+        #content = parse(content).plain_text()
 
         if self._process_only_first_n_paragraphs > 0:
             # untested bit of code ... to be tweaked, online it says a line is needed for markdown to do a

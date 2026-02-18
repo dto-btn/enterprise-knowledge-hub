@@ -2,9 +2,7 @@
 Endpoints for interacting with the knowledge database.
 """
 from fastapi import APIRouter, Query
-
-from services.db.model import DocumentRecord
-from services.knowledge.query import QueryService
+from services.database.database_service import QueryService
 
 router = APIRouter()
 _query_service = QueryService()
@@ -16,6 +14,7 @@ def search_database(
 ):
     """Endpoint to search Wikipedia articles by query."""
     # Call the service layer to perform the search
+    print(f"Searching database for query: {query} with limit: {limit}")
     results = _query_service.search(query, limit)
     return {
         "query": query,
@@ -25,6 +24,7 @@ def search_database(
 @router.get("/retrieve/{title}")
 def retrieve_wiki_articles(
     title:str
-) -> list[DocumentRecord]:
+):
     """Get wiki article content"""
+    print(f"(search_retrieve endpoints) Retrieving wiki articles for title: {title}")
     return _query_service.get_article_content_by_title(title)
