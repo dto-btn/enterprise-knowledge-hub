@@ -173,7 +173,7 @@ class WikipediaKnowedgeService(KnowledgeService):
         self._repository.insert(record_to_insert.as_mapping())
         # print(f"Finished storing item: {item.get('title', 'unknown_title')}")
 
-    def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]:
+    def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]: #pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Process a single index file and yield WikipediaItems."""
         start_line = self._load_progress(index_path)
         if start_line > 0:

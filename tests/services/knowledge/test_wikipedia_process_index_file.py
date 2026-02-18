@@ -20,6 +20,7 @@ INDEX_FILE_CONTENT = """5:1:Foo1
 """
 
 class TestWikipediaProcessIndexFile(unittest.TestCase):
+    """mock harness for testing the index process for wikipedia"""
     def _build_service(self) -> WikipediaKnowedgeService:
         repository = MagicMock()
         repository.update_history_table_start.return_value = 123
