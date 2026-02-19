@@ -133,6 +133,7 @@ class WikipediaKnowedgeService(KnowledgeService):
 
             try:
                 yield from self._process_index_file(index_path, dump_path)
+                # DONE INDEXING FILE X, call history service to report (future)
             except OSError as exc:
                 self.logger.error("Failed to process index file %s: %s. Continuing to next file.", index_path, exc)
                 continue
@@ -191,30 +192,38 @@ class WikipediaKnowedgeService(KnowledgeService):
         with open(dump_path, 'rb') as dump_file, bz2.open(index_path, mode='rt') as index_file:
             line_iter = iter(index_file)
             line = next(line_iter, None)
-            last_offset = 0
+            last_offset = None
             while line is not None:
                 next_line = next(line_iter, None)
-                is_last = next_line is None
 
                 current_line += 1
                 line_offset = self._parse_line_offset(line, current_line, index_path.name)
-                if line_offset is None:
+                if line_offset is None: # if we cannot read the current line skip to the next already..
                     line = next_line
                     continue
 
-                # Skip already processed lines
+                # adding a clause that sets the last_offset for the first time.
+                if last_offset is None:
+                    last_offset = line_offset
+
+                # Skip already processed lines (update byte offset as we go)
                 if current_line <= start_line:
                     last_offset = line_offset
                     line = next_line
                     continue
 
-                if last_offset != line_offset or is_last:
+                # if the current byte offset is different than the last byte offset it means we need to extract from bz2
+                if last_offset != line_offset:
                     yield from self._process_chunk(dump_file, dump_path.name, last_offset, line_offset, source)
+                    last_offset = line_offset
+
+                # Last item on the list clause... need to extract until the end of the bz2 archive..
+                if next_line is None:
+                    yield from self._process_chunk(dump_file, dump_path.name, line_offset, None, source)
 
                 if current_line % self._progress_flush_interval == 0:
                     self._save_progress(index_path, current_line)
 
-                last_offset = line_offset
                 line = next_line
 
         self._save_progress(index_path, current_line)
@@ -232,19 +241,22 @@ class WikipediaKnowedgeService(KnowledgeService):
             return None
 
     def _process_chunk( #pylint: disable=too-many-arguments,too-many-positional-arguments
-        self, dump_file, dump_name: str, prev_offset: int | None, offset: int, source: Source | None
+        self, dump_file, dump_name: str, prev_offset: int , offset: int | None, source: Source | None
     ) -> Iterator[WikipediaItem]:
         """Decompress and parse a chunk of the dump file."""
-
-        length = offset - prev_offset
-        dump_file.seek(prev_offset)
-        data = dump_file.read(length)
+        dump_file.seek(prev_offset) # read from where we left off.
+        # If we have an offset if means we need to stop somewhere.
+        if offset is not None:
+            length = offset - prev_offset
+            data = dump_file.read(length)
+        else:
+            data = dump_file.read() # read until the end of the file.
 
         try:
             decompressed = bz2.decompress(data)
             xml_content = decompressed.decode("utf-8", errors="ignore")
             yield from self._extract_pages_from_xml(xml_content, source)
-        except OSError as exc:
+        except Exception as exc:
             self.logger.error(
                 "Failed to decompress chunk from %s between offsets %s and %s: %s",
                 dump_name, prev_offset, offset, exc
