@@ -244,17 +244,19 @@ class WikipediaKnowedgeService(KnowledgeService):
         self, dump_file, dump_name: str, prev_offset: int , offset: int | None, source: Source | None
     ) -> Iterator[WikipediaItem]:
         """Decompress and parse a chunk of the dump file."""
-        data = dump_file.seek(prev_offset) # read from where we left off.
+        dump_file.seek(prev_offset) # read from where we left off.
         # If we have an offset if means we need to stop somewhere.
-        if offset:
+        if offset is not None:
             length = offset - prev_offset
             data = dump_file.read(length)
+        else:
+            data = dump_file.read() # read until the end of the file.
 
         try:
             decompressed = bz2.decompress(data)
             xml_content = decompressed.decode("utf-8", errors="ignore")
             yield from self._extract_pages_from_xml(xml_content, source)
-        except OSError as exc:
+        except Exception as exc:
             self.logger.error(
                 "Failed to decompress chunk from %s between offsets %s and %s: %s",
                 dump_name, prev_offset, offset, exc
