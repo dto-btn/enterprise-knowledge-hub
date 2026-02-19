@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "knowledge-hub.fullname" . }}
+  name: {{ include "ekh.fullname" . }}
   labels:
-    {{- include "knowledge-hub.labels" . | nindent 4 }}
+    {{- include "ekh.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "knowledge-hub.selectorLabels" . | nindent 6 }}
+      {{- include "ekh.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -16,7 +16,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "knowledge-hub.labels" . | nindent 8 }}
+        {{- include "ekh.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -78,7 +78,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   {{- if kindIs "string" .password }}
-                  name: {{include "knowledge-hub.fullname" .}}-postgresql-secret
+                  name: {{include "ekh.fullname" .}}-postgresql-secret
                   key: POSTGRES_PASSWORD
                   {{- else if and (kindIs "map" .password) (.password.valueFrom.secretKeyRef.name) (.password.valueFrom.secretKeyRef.key) }}
                   name: {{ .password.valueFrom.secretKeyRef.name }}
@@ -91,7 +91,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   {{- if kindIs "string" .Values.rabbitmq.url }}
-                  name: {{include "knowledge-hub.fullname" .}}-rabbitmq-url-secret
+                  name: {{include "ekh.fullname" .}}-rabbitmq-url-secret
                   key: RABBITMQ_URL
                   {{- else if and (kindIs "map" .Values.rabbitmq.url) (.Values.rabbitmq.url.valueFrom.secretKeyRef.name) (.Values.rabbitmq.url.valueFrom.secretKeyRef.key) }}
                   name: {{ .Values.rabbitmq.url.valueFrom.secretKeyRef.name }}

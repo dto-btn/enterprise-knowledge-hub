@@ -1,6 +1,6 @@
 apiVersion: v2
-name: enterprise-knowledge-hub
-description: A Helm chart for Kubernetes
+name: ekh
+description: A Helm chart for Kubernetes for the Enterprise Knowledge Hub (EKH) application.
 
 # A chart can be either an 'application' or a 'library' chart.
 #

@@ -4,10 +4,10 @@ fullnameOverride: ""
 replicaCount: 1
 
 image:
-  repository: ghcr.io/ssc-dsai/knowledge-hub
+  repository: ghcr.io/ssc-dsai/enterprise-knowledge-hub
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "0.1.0-cuda-9.0" #h100/h200 GPUs ... else we need - 
 
 imagePullSecrets: []
 
@@ -35,7 +35,7 @@ postgresql:
   #      key:
 
 rabbitmq:
-  url: "amqp://guest:guest@my-rabbitmq.example.com:5672"
+  url: "amqps://guest:guest@my-rabbitmq.example.com:5672"
   #  valueFrom:
   #    secretKeyRef:
   #      name:
