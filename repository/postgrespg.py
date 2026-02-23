@@ -240,36 +240,51 @@ class WikipediaPgRepository:
             rows = cur.fetchall()
         return rows
 
-    def update_history_table_start(self, time, title: str):
-        """Update the history table with the last modified date and title."""
+    def update_history_table_start(self, start_time, service_name: str, status: str = "started", process_running: bool = True, ingest_running: bool = True) -> int:
+        """Update the history table on run start"""
 
         query_sql = sql.SQL(
             """
-            INSERT INTO run_history (start_time, file_name)
-            VALUES (%s, %s)
+            INSERT INTO run_history (start_time, service_name, status, process_running, ingest_running)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id
             """
         )
 
         with self._pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(query_sql, (time, title))
+            cur.execute(query_sql, (start_time, service_name, status, process_running, ingest_running))
             result = cur.fetchone()[0]
             conn.commit()
             return result
 
-    def update_history_table_end(self, time, id: int) -> None:
-        """Update the history table with the end date based on title."""
+    def update_history_table_end(self, status, end_time, id: int, process_running: bool = False, ingest_running: bool = False) -> None:
+        """Update the history table on run end"""
 
         query_sql = sql.SQL(
             """
             UPDATE run_history
-            SET end_time = %s
+            SET end_time = %s, status = %s, process_running = %s, ingest_running = %s
             WHERE id = %s
             """
         )
 
         with self._pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(query_sql, (time, id))
+            cur.execute(query_sql, (end_time, status, process_running, ingest_running, id))
+            conn.commit()
+
+    def update_process_step_end(self, id: int, process_running: bool = False) -> None:
+        """Update the history table's process column on processing step end"""
+
+        query_sql = sql.SQL(
+            """
+            UPDATE run_history
+            SET process_running = %s
+            WHERE id = %s
+            """
+        )
+
+        with self._pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(query_sql, (process_running, id))
             conn.commit()
 
     def close(self) -> None:

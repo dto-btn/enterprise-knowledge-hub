@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import threading
+from datetime import datetime
+
 from services.knowledge.models import KnowledgeItem
 from services.queue.queue_worker import QueueWorker
 from services.queue.queue_service import QueueService
@@ -34,6 +36,9 @@ class KnowledgeService(ABC):
         self._producer_done.clear()
         self._stop_event.clear()
         self._stats.reset()  # Reset stats at the start of each run
+
+        self._history_id = self._repository.update_history_table_start(datetime.now(), self.service_name)
+
         with ThreadPoolExecutor(max_workers=3) as executor:
             queue_future = executor.submit(self.ingest)
             process_future = executor.submit(self.process)
@@ -42,6 +47,8 @@ class KnowledgeService(ABC):
             queue_future.result()
             process_future.result()
             insert_future.result()
+
+        self._repository.update_history_table_end("completed", datetime.now(), self._history_id)
 
     @abstractmethod
     def fetch_from_source(self) -> Iterator[KnowledgeItem]:

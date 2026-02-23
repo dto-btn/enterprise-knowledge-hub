@@ -122,9 +122,7 @@ class WikipediaKnowedgeService(KnowledgeService):
             The content will be first entrypoint in the main .bz2 multistream file.
                 Ex: 345:6789:Fruits (Read more on the doc from the README.md from content/ folder)
         """
-        print(f"Looking for index files in {self._content_folder_path}")
         for index_path in self._discover_index_files():
-            print(f"Found index file: {index_path}")
             self.logger.info("Reading data from Wikipedia source: %s", index_path)
 
             dump_path = self._get_dump_path(index_path)
@@ -152,11 +150,6 @@ class WikipediaKnowedgeService(KnowledgeService):
         dump_name = f"{prefix}{chunk if chunk else ''}.xml.bz2"
         dump_path = index_path.with_name(dump_name)
 
-        # print(f"dump_name: {dump_name}")
-        # print(f"dump_path: {dump_path}")
-        # now = datetime.now()
-        # self._repository.update_history_table_start(now, dump_name)
-
         if not dump_path.exists():
             self.logger.warning("Dump file not found: %s", dump_path)
             return None
@@ -168,11 +161,9 @@ class WikipediaKnowedgeService(KnowledgeService):
         self.queue_service.write(self._processed_queue_name(), queue_item)
 
     def store_item(self, item: dict[str, object]) -> None:
-        print(f"Storing item: {item.get('title', 'unknown_title')}")
         wiki_item = DatabaseWikipediaItem.from_rabbitqueue_dict(item)
         record_to_insert = WikipediaDbRecord.from_item(wiki_item)
         self._repository.insert(record_to_insert.as_mapping())
-        # print(f"Finished storing item: {item.get('title', 'unknown_title')}")
 
     def _process_index_file(self, index_path: Path, dump_path: Path) -> Iterator[WikipediaItem]: #pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Process a single index file and yield WikipediaItems."""
@@ -184,10 +175,6 @@ class WikipediaKnowedgeService(KnowledgeService):
 
         source_name = index_path.name .split("-")[0]
         source = Source.WIKIPEDIA_EN if source_name == "enwiki" else Source.WIKIPEDIA_FR if source_name == "frwiki" else None #pylint: disable=line-too-long
-
-        print(f"Processing index file: {index_path} with dump file: {dump_path} (source: {source})")
-        now = datetime.now()
-        history_id = self._repository.update_history_table_start(now, dump_path.name)
 
         with open(dump_path, 'rb') as dump_file, bz2.open(index_path, mode='rt') as index_file:
             line_iter = iter(index_file)
@@ -229,7 +216,8 @@ class WikipediaKnowedgeService(KnowledgeService):
         self._save_progress(index_path, current_line)
         self.logger.info("Completed %s at line %d", index_path.name, current_line)
 
-        self._repository.update_history_table_end(datetime.now(), history_id)
+        # Once processing is complete, we can mark the process_running column as false
+        self._repository.update_process_step_end(self._history_id)
 
     def _parse_line_offset(self, line: str, line_num: int, filename: str) -> int | None:
         """Parse the byte offset from an index line. Returns None if malformed."""
@@ -264,7 +252,6 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def _extract_pages_from_xml(self, xml_content: str, source: Source | None) -> Iterator[WikipediaItem]:
         """Extract and parse all pages from XML content."""
-        print(f"Extracting pages from XML content (source: {source})")
         for page_match in re.finditer(r"<page>(.*?)</page>", xml_content, re.DOTALL):
             page_xml = page_match.group(0)
 
@@ -305,7 +292,6 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def _discover_index_files(self) -> Iterator[Path]:
         """Discover index files in the content folder."""
-        print(f"Searching for index files in ---> {self._content_folder_path}")
         self.logger.debug("Searching for index files in ---> %s", self._content_folder_path)
         for node in sorted(self._content_folder_path.rglob("*.txt.bz2")):
             if not node.is_file():

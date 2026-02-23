@@ -20,7 +20,10 @@ CREATE TABLE documents (
 );
 CREATE TABLE run_history (
    id SERIAL PRIMARY KEY,
-   file_name TEXT,
+   service_name TEXT,
+   status TEXT,
+   process_running BOOLEAN,
+   ingest_running BOOLEAN,
    start_time TIMESTAMP,
    end_time TIMESTAMP
 );
