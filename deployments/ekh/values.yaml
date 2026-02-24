@@ -8,7 +8,7 @@ image:
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   #tag: "0.1.0-cuda-9.0" #h100/h200 GPUs ... else we need - 
-  tag: "0.1.0-cpu" # CPU only, for testing on minikube locally.
+  tag: "0.1.0" # CPU only, for testing on minikube locally.
 
 imagePullSecrets:
   - name: ghcr-pull-secret
