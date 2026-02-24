@@ -25,10 +25,10 @@ appVersion: "0.1.0"
 
 dependencies:
   - name: postgresql
-    version: "~15.0.0"
+    version: "18.4.0"
     repository: "https://charts.bitnami.com/bitnami"
     condition: postgresql.enabled
   - name: rabbitmq
-    version: "~15.0.0"
+    version: "16.0.14"
     repository: "https://charts.bitnami.com/bitnami"
     condition: rabbitmq.enabled
