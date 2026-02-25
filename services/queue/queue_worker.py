@@ -1,23 +1,27 @@
 """
 Docstring for services.queue.queue_worker
 """
+from logging import Logger
 import time
+from threading import Event
 from dataclasses import dataclass
+
+from services.queue.queue_service import QueueService
 
 @dataclass
 class QueueWorker:
     """
-    Docstring for QueueWorker
+    Worker class encompasses polling from queues 
     """
     def __init__(self, queue_service, logger, stop_event, poll_interval=0.5):
-        self.queue_service = queue_service
-        self.logger = logger
-        self.stop_event = stop_event
+        self.queue_service: QueueService = queue_service
+        self.logger: Logger = logger
+        self.stop_event: Event = stop_event
         self.poll_interval = poll_interval
 
     def run(self, service_name: str, queue_name: str, handler, should_exit):
         """
-        Docstring for run
+        Main function to poll from queues.
 
         :param self: Description
         :param service_name: name for specific service implementation running this
@@ -37,13 +41,8 @@ class QueueWorker:
                         self.logger.info("Stop event is true. Stopping process: %s - %s", service_name, queue_name)
                         self._acknowledge(delivery_tag, successful=False)
                         break
-                    input("Press enter to continue")
-                    print(delivery_tag)
                     is_handler_manages_ack = handler(item, delivery_tag)
-
-                    # to include batch processing/batch acking
-                    if is_handler_manages_ack is True:
-                        self._acknowledge(delivery_tag, successful=True)
+                    # if handler manages acknowledgement back to queue then ignore
                     if is_handler_manages_ack is False:
                         self._acknowledge(delivery_tag, successful=True)
                     else:
@@ -61,6 +60,6 @@ class QueueWorker:
             time.sleep(self.poll_interval)
 
     def _acknowledge(self, delivery_tag, successful: bool):
-        print("ack in queue worker" + str(successful))
+        """Acknowledge message back to queue """
         if delivery_tag is not None:
             self.queue_service.read_ack(delivery_tag, successful=successful)

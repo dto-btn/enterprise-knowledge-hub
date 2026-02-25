@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
-from typing import TypeVar, Any
+from typing import Any
 import logging
 import threading
 from services.knowledge.models import KnowledgeItem
@@ -13,8 +13,6 @@ from services.knowledge.wikipedia.models import WikipediaItemProcessed
 from services.queue.queue_worker import QueueWorker
 from services.queue.queue_service import QueueService
 from services.stats.knowledge_service_stats import KnowledgeServiceStats
-
-T = TypeVar("T")
 
 @dataclass
 class KnowledgeService(ABC):
@@ -39,12 +37,12 @@ class KnowledgeService(ABC):
         self._producer_done.clear()
         self._stop_event.clear()
         self._stats.reset()  # Reset stats at the start of each run
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            # queue_future = executor.submit(self.ingest)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            queue_future = executor.submit(self.ingest)
             process_future = executor.submit(self.process)
             insert_future = executor.submit(self.store)
             # Wait for both to complete and propagate any exceptions
-            # queue_future.result()
+            queue_future.result()
             process_future.result()
             insert_future.result()
 
@@ -76,7 +74,6 @@ class KnowledgeService(ABC):
     @abstractmethod
     def get_batch_size(self) -> int:
         """Get the set batch size"""
-        # TODO AR: I think i confused postgres batch_size and batch_size.  To fix after
         raise NotImplementedError("Subclasses must implement the get_batch_size method.")
 
     def _ingest_queue_name(self) -> str:
@@ -114,17 +111,10 @@ class KnowledgeService(ABC):
             poll_interval=self._poll_interval
         )
 
-        def acknowledge(delivery_tag, successful):
-            print("ack definition" + str(successful))
+        def acknowledge(delivery_tag: int, successful: bool):
             self.queue_service.read_ack(delivery_tag, successful)
             
         handler = BatchHandler(self.process_item, acknowledge, batch_size)
-        # def handler(item: dict[str, object]) -> None:
-        #     processed = self.process_item(item) # GPU work happens here
-        #     processed_items: list[KnowledgeItem] = processed if isinstance(processed, list) else [processed]
-        #     for processed_item in processed_items:
-        #         self.emit_processed_item(processed_item)
-        #     self._stats.record_processed()
 
         def should_exit(drained_any: bool) -> bool:
             #Producer done and ingestion queue empty AND queue was empty this iteration
@@ -164,9 +154,15 @@ class KnowledgeService(ABC):
             poll_interval=self._poll_interval
         )
 
-        def handler(item: WikipediaItemProcessed, delivery_tag: str) -> None:
-            if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
-                self.store_item(WikipediaItemProcessed.model_validate(item)) #TODO AR:  ack needs to happen here
+        def handler(item: WikipediaItemProcessed, delivery_tag: str) -> bool:
+            try:
+                if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
+                    self.store_item(WikipediaItemProcessed.model_validate(item))
+            except Exception:
+                raise
+            finally:
+                # this is to tell queueworker to handle ack
+                return False
 
         def should_exit(drained_any: bool) -> bool:
             #Producer done and ingestion queue empty AND queue was empty this iteration
