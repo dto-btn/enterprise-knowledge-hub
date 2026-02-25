@@ -15,7 +15,7 @@ import numpy as np
 from dotenv import load_dotenv
 from wikitextparser import remove_markup
 
-from provider.embedding.chunk_text import TextChunker
+from provider.embedding.chunk_text import chunk_text_by_tokens
 from provider.embedding.qwen3.embedder_factory import get_embedder
 from repository.postgrespg import WikipediaDbRecord, WikipediaPgRepository
 from services.knowledge.base import KnowledgeService
@@ -59,7 +59,6 @@ class WikipediaKnowedgeService(KnowledgeService):
     _progress_flush_interval: int = 1000 # for the .progress file we track line number we stpped.
     _batch_size: int = int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_BATCH_SIZE", "100"))
     _debug_extraction: bool = os.getenv("DEBUG_EXTRACTION", "false").lower() in ("1", "true", "yes")
-    _tiktoken: TextChunker = TextChunker()
 
     def __init__(self, queue_service, logger, repository: WikipediaPgRepository | None = None):
         super().__init__(queue_service=queue_service, logger=logger, service_name="wikipedia")
@@ -73,22 +72,22 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def get_batch_size(self):
         return self._batch_size
-    
-    def process_item(self, knowledge_items: List[KnowledgeItem]) -> list[WikipediaItemProcessed]:
+
+    def process_item(self, knowledge_item: List[KnowledgeItem]) -> list[WikipediaItemProcessed]:
         """Process ingested WikipediaItem from the queue and return one row per text chunk."""
         try:
-            self.logger.info("Generating embeddings for %s", ", ".join(item['title'] for item in knowledge_items))
+            self.logger.info("Generating embeddings for %s", ", ".join(item['title'] for item in knowledge_item))
 
             batch: List[str] = []
-            for item in knowledge_items:
+            for item in knowledge_item:
                 batch.append(item['content'])
 
             embeddings = self.embedder.embed(batch)
             arr = np.asarray(embeddings)
-            
+
             results: list[WikipediaItemProcessed] = []
-            
-            for (item, vec) in zip(knowledge_items, arr):
+
+            for (item, vec) in zip(knowledge_item, arr):
                 results.append(
                     WikipediaItemProcessed(
                         name=item['name'],
@@ -131,27 +130,27 @@ class WikipediaKnowedgeService(KnowledgeService):
 
     def emit_fetched_item(self, item) -> None:
         max_tokens = getattr(self.embedder, "max_seq_length", None)
-        
+
         # taking item and chunking them
-        chunks = self._tiktoken.chunk_text_by_tokens(item.content, max_tokens=max_tokens)
+        chunks = chunk_text_by_tokens(item.content, max_tokens=max_tokens)
         results: list[WikipediaItemRaw] = []
         num_chunks = len(chunks)
-        
+
         for idx, chunk_text in enumerate(chunks, start=1):
-                results.append(
-                    WikipediaItemRaw(
-                        name=item.name,
-                        title=f"{item.title} (chunk {idx}/{num_chunks})",
-                        content=chunk_text,
-                        last_modified_date=item.last_modified_date,
-                        pid=item.pid,
-                        chunk_index=idx,
-                        chunk_count=num_chunks,
-                        source=item.source
-                    )
+            results.append(
+                WikipediaItemRaw(
+                    name=item.name,
+                    title=f"{item.title} (chunk {idx}/{num_chunks})",
+                    content=chunk_text,
+                    last_modified_date=item.last_modified_date,
+                    pid=item.pid,
+                    chunk_index=idx,
+                    chunk_count=num_chunks,
+                    source=item.source
                 )
-        for wikiItem in results:
-            self.queue_service.write(self._ingest_queue_name(), wikiItem)
+            )
+        for wiki_item in results:
+            self.queue_service.write(self._ingest_queue_name(), wiki_item)
 
     def _get_dump_path(self, index_path: Path) -> Path | None:
         """Derive the dump file path from an index file path."""

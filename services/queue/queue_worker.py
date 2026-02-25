@@ -34,7 +34,7 @@ class QueueWorker:
         while not self.stop_event.is_set():
             drained_any = False # to check if any messages read/drained this iteration
 
-            for item, delivery_tag in self.queue_service.read(queue_name): #TODO AR: item should be typed now.  if we are trying to be more strict
+            for item, delivery_tag in self.queue_service.read(queue_name):
                 drained_any = True
                 try:
                     if self.stop_event.is_set():

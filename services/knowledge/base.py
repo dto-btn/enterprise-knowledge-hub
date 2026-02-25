@@ -70,7 +70,7 @@ class KnowledgeService(ABC):
     def store_item(self, item: WikipediaItemProcessed) -> None:
         """Insert the object into repository"""
         raise NotImplementedError("Subclasses must implement the store_item method.")
-    
+
     @abstractmethod
     def get_batch_size(self) -> int:
         """Get the set batch size"""
@@ -113,7 +113,7 @@ class KnowledgeService(ABC):
 
         def acknowledge(delivery_tag: int, successful: bool):
             self.queue_service.read_ack(delivery_tag, successful)
-            
+
         handler = BatchHandler(self.process_item, acknowledge, batch_size, self.logger)
 
         def should_exit(drained_any: bool) -> bool:
@@ -155,14 +155,11 @@ class KnowledgeService(ABC):
         )
 
         def handler(item: WikipediaItemProcessed, delivery_tag: str) -> bool:
-            try:
-                if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
-                    self.store_item(WikipediaItemProcessed.model_validate(item))
-            except Exception:
-                raise
-            finally:
-                # this is to tell queueworker to handle ack
-                return False
+            if os.getenv("DB_SKIP_STORE", "false").lower() not in ("1", "true", "yes"):
+                self.store_item(WikipediaItemProcessed.model_validate(item))
+            self.logger.debug("DeliveryTag: %s", delivery_tag)
+            # this is to tell queueworker to handle ack
+            return False
 
         def should_exit(drained_any: bool) -> bool:
             #Producer done and ingestion queue empty AND queue was empty this iteration

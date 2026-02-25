@@ -3,12 +3,11 @@
 # pylint: disable=duplicate-code
 import logging
 import os
-
+from typing import List
 import numpy as np
 import torch
 import torch.cuda
 from dotenv import load_dotenv
-from typing import List
 from sentence_transformers import SentenceTransformer
 
 from provider.embedding.base import EmbeddingBackendProvider, QWEN3_QUERY_INSTRUCTION
@@ -117,7 +116,7 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
 
         return embeddings
 
-    def chunk_text_by_tokens(self, text: str, max_tokens: int = None, overlap_tokens: int = 200) -> list[str]:
+    def chunk_text_by_tokens(self, text: str, max_tokens: int = None, overlap_tokens: int = 10) -> list[str]:
         """Split text into chunks based on token count with overlap."""
         if max_tokens is None:
             max_tokens = self.max_seq_length

@@ -9,7 +9,7 @@ import torch
 import numpy as np
 
 from services.knowledge.models import KnowledgeItem
-    
+
 Tensor = torch.Tensor
 
 class Source(StrEnum):
@@ -78,13 +78,14 @@ class WikipediaItemRaw(KnowledgeItem):
 class WikipediaItemProcessed(WikipediaItemRaw):
     """Knowledge item representing a Wikipedia page stored in a database."""
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    
+
     embeddings: np.ndarray | Tensor | None = None
-    
+
     @field_serializer("embeddings")
     def serialize_embeddings(self, value):
+        """custom serializer for embeddings prop"""
         return _encode_embeddings(value)
-    
+
     @field_validator("embeddings", mode="before")
     @classmethod
     def _val_embedding(cls, value):
