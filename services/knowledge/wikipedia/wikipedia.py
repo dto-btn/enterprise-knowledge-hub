@@ -15,7 +15,6 @@ import numpy as np
 from dotenv import load_dotenv
 from wikitextparser import remove_markup
 
-from provider.embedding.chunk_text import chunk_text_by_tokens
 from provider.embedding.qwen3.embedder_factory import get_embedder
 from repository.postgrespg import WikipediaDbRecord, WikipediaPgRepository
 from services.knowledge.base import KnowledgeService
