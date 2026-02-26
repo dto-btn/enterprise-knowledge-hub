@@ -37,10 +37,10 @@ rabbitmq: #doc: https://artifacthub.io/packages/helm/bitnami/rabbitmq
   user: "admin"
   vhost: "/"
   url: ""
-  image:
-    registry: docker.io
-    repository: rabbitmq
-    tag: "4.2.1-management"
+#   image:
+#     registry: docker.io
+#     repository: rabbitmq
+#     tag: "4.2.1-management"
   auth:
     username: "admin"
     password: ""
