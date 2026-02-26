@@ -3,17 +3,6 @@ replicaCount: 1
 image:
   pullPolicy: IfNotPresent
 
-pgvector:
-  postgresql:
-    persistence:
-      enabled: true
-      size: 4Gi
-
-rabbitmq:
-  auth:
-    username: "guest"
-    password: "guest"
-
 resources:
   requests:
     memory: "64Mi"
@@ -21,3 +10,13 @@ resources:
   limits:
     memory: "256Mi"
     cpu: "500m"
+
+pgvector:
+  enabled: true
+  host: ""
+  port: 5432
+  batchSize: 100
+  password: ""
+  postgresql:
+    database: "postgres"
+    username: "postgres"

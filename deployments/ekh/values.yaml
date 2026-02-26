@@ -24,24 +24,26 @@ wikiEmbeddingModel:
   maxDim: 512
   dtype: "float16"
 
-pgvector:
+####################################################
+# VALUES FOR DEPENDENCIES (PGVECTOR, RABBITMQ)
+####################################################
+pgvector: # disabled anywhere but locally to test.
   enabled: false
 
-rabbitmq:
+rabbitmq: #doc: https://artifacthub.io/packages/helm/bitnami/rabbitmq
   enabled: true
-  url: ""
   host: ""
   port: 5672
-  user: "guest"
-  password: "guest"
+  user: "admin"
   vhost: "/"
+  url: ""
   image:
     registry: docker.io
     repository: rabbitmq
     tag: "4.2.1-management"
   auth:
-    username: "guest"
-    password: "guest"
+    username: "admin"
+    password: ""
 
 podAnnotations: {}
 podLabels: {}

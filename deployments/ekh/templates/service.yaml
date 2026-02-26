@@ -18,4 +18,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "ekh.selectorLabels" . | nindent 4 }}
+    {{ include "ekh.selectorLabels" . | nindent 4 }}

@@ -2,15 +2,6 @@ replicaCount: 1
 
 image:
   pullPolicy: IfNotPresent
-
-pgvector:
-  enabled: false
-
-rabbitmq:
-  auth:
-    username: "guest"
-    password: "guest"
-
 resources:
   requests:
     memory: "64Mi"

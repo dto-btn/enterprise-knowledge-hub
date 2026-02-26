@@ -3,18 +3,18 @@ kind: Deployment
 metadata:
   name: {{ include "ekh.fullname" . }}
   labels: 
-    {{- include "ekh.labels" . | nindent 4 }}
+    {{ include "ekh.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 1 }}
   selector:
     matchLabels:
-      {{- include "ekh.selectorLabels" . | nindent 6 }}
+      {{ include "ekh.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      {{- toYaml . | nindent 6 }}
       {{- end }}
       labels:
         {{- include "ekh.labels" . | nindent 8 }}
@@ -22,10 +22,10 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+      {{ with .Values.imagePullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- toYaml . | nindent 8 }}
+      {{ end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -70,38 +70,16 @@ spec:
             - name: POSTGRES_DB
               value: {{ .postgresql.database | quote }}
             - name: POSTGRES_HOST
-              value: {{ $postgresHost | quote }}
+              value: {{ .host | quote }}
             - name: POSTGRES_PORT
               value: {{ .port | quote }}
             - name: POSTGRES_BATCH_SIZE
               value: {{ .batchSize | quote }}
             - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  {{- if kindIs "string" .password }}
-                  name: {{ include "ekh.fullname" $root }}-pgvector-secret
-                  key: POSTGRES_PASSWORD
-                  {{- else if and (kindIs "map" .password) (.password.valueFrom.secretKeyRef.name) (.password.valueFrom.secretKeyRef.key) }}
-                  name: {{ .password.valueFrom.secretKeyRef.name }}
-                  key: {{ .password.valueFrom.secretKeyRef.key }}
-                  {{- else }}
-                  {{ fail "Error occurred while templating .pgvector.password. Please ensure it is either a string or a map referencing valueFrom.secretKeyRef" }}
-                  {{- end }}
+              value: {{ .password | quote }}
             {{- end }}
             - name: RABBITMQ_URL
-              {{- if and (kindIs "string" .Values.rabbitmq.url) (ne .Values.rabbitmq.url "") }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ekh.fullname" . }}-rabbitmq-url-secret
-                  key: RABBITMQ_URL
-              {{- else if and (kindIs "map" .Values.rabbitmq.url) (.Values.rabbitmq.url.valueFrom.secretKeyRef.name) (.Values.rabbitmq.url.valueFrom.secretKeyRef.key) }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.rabbitmq.url.valueFrom.secretKeyRef.name }}
-                  key: {{ .Values.rabbitmq.url.valueFrom.secretKeyRef.key }}
-              {{- else }}
-              value: {{ $rabbitmqUrl | quote }}
-              {{- end }}
+              value: {{ .Values.rabbitmq.url | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
