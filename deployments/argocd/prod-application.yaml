@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/ssc-dsai/enterprise-knowledge-hub.git
-    targetRevision: HEAD
+    targetRevision: main
     path: deployments/ekh
     helm:
       valueFiles:
