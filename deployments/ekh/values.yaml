@@ -1,0 +1,113 @@
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/ssc-dsai/enterprise-knowledge-hub
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  #tag: "0.1.0-cuda-9.0" #h100/h200 GPUs ... else we need - 
+  tag: "0.1.0" # CPU only, for testing on minikube locally.
+
+imagePullSecrets: []
+
+pytorch:
+  allocConf: "max_split_size_mb:256,garbage_collection_threshold:0.7,expandable_segments:False"
+  llamaCuda: 1
+  cudaGpuCap: 0.8
+
+wikiEmbeddingModel:
+  backend: "SENTENCE_TRANSFORMER"
+  cleanup: false
+  batchSize: 3
+  maxLength: 4096
+  maxDim: 512
+  dtype: "float16"
+
+####################################################
+# VALUES FOR DEPENDENCIES (PGVECTOR, RABBITMQ)
+####################################################
+# pgvector.enabled = true  → deploy the cloudpirates/postgres sub-chart (local dev)
+# pgvector.enabled = false → connect to an external PostgreSQL instance (dev/prod)
+pgvector:
+  enabled: false
+  host: "some-cloud-service-dns"
+  port: 5432
+  auth:
+    username: "postgres"
+    database: "postgres"
+    # Password is managed by the auto-generated <release>-credentials secret.
+    # When the sub-chart is enabled, point it at the same secret so it initialises
+    # postgres with the same generated password:
+    #   existingSecret: "<release>-credentials"  ← set in your env values file
+    #   secretKeys:
+    #     adminPasswordKey: "postgres-password"
+    existingSecret: ""
+    secretKeys:
+      adminPasswordKey: "postgres-password"
+
+rabbitmq: #doc: https://artifacthub.io/packages/helm/cloudpirates-rabbitmq/rabbitmq
+  enabled: true
+  host: ""
+  port: 5672
+  user: "admin"
+  vhost: "/"
+  url: ""
+  auth:
+    username: "admin"
+    password: "" #let this service manage the erlangcookie and admin pwd
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  {}
+  # fsGroup: 2000
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 1
+
+securityContext:
+  {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+  limits:
+    memory: "4Gi"
+    cpu: "4000m"
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+####################################################
+# CONTENT PERSISTENT VOLUME
+# Mounted at /app/content inside the container.
+# Drop your Wikipedia (or other) zip/dump files here;
+# the service reads from /app/content/wikipedia/
+####################################################
+contentStorage:
+  enabled: false
+  size: 250Gi
+  accessModes:
+    - ReadWriteMany
+  storageClass: ""
+  annotations: {}

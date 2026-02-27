@@ -1,0 +1,33 @@
+replicaCount: 1
+
+image:
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+contentStorage:
+  enabled: true
+  size: 5Gi
+  accessModes:
+    - ReadWriteMany
+  storageClass: ""
+  annotations: {}
+
+pgvector:
+  enabled: true
+  # host defaults to <release-name>-pgvector automatically — override only if needed
+  host: ""
+  port: 5432
+  batchSize: 100
+  auth:
+    username: "postgres"
+    database: "postgres"
+  image:
+    registry: docker.io
+    repository: pgvector/pgvector
+    tag: "pg18"
+  initdb:
+    scripts:
+      init_pgvector.sql: |
+        CREATE EXTENSION IF NOT EXISTS vector;
