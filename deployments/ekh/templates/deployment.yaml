@@ -82,6 +82,17 @@ spec:
               value: {{ .Values.rabbitmq.url | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.contentStorage.enabled }}
+          volumeMounts:
+            - name: content
+              mountPath: /app/content
+          {{- end }}
+      {{- if .Values.contentStorage.enabled }}
+      volumes:
+        - name: content
+          persistentVolumeClaim:
+            claimName: {{ include "ekh.fullname" . }}-content
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -69,14 +69,28 @@ service:
 
 resources:
   requests:
-    memory: "256Mi"
-    cpu: "500m"
+    memory: "2Gi"
+    cpu: "1000m"
   limits:
-    memory: "1Gi"
-    cpu: "2000m"
+    memory: "4Gi"
+    cpu: "4000m"
 
 nodeSelector: {}
 
 tolerations: []
 
 affinity: {}
+
+####################################################
+# CONTENT PERSISTENT VOLUME
+# Mounted at /app/content inside the container.
+# Drop your Wikipedia (or other) zip/dump files here;
+# the service reads from /app/content/wikipedia/
+####################################################
+contentStorage:
+  enabled: false
+  size: 250Gi
+  accessModes:
+    - ReadWriteMany
+  storageClass: ""
+  annotations: {}
