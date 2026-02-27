@@ -14,12 +14,14 @@ imagePullSecrets:
   - name: ghcr-pull-secret
 
 pytorch:
-  allocConf: "max_split_size_mb:256,garbage_collection_threshold:0.8,expandable_segments:False"
+  allocConf: "max_split_size_mb:256,garbage_collection_threshold:0.7,expandable_segments:False"
+  llamaCuda: 1
+  cudaGpuCap: 0.8
 
 wikiEmbeddingModel:
-  backend: "SENTENCE-TRANSFORMERS"
+  backend: "SENTENCE_TRANSFORMER"
   cleanup: false
-  batchSize: 4
+  batchSize: 3
   maxLength: 4096
   maxDim: 512
   dtype: "float16"
@@ -27,10 +29,27 @@ wikiEmbeddingModel:
 ####################################################
 # VALUES FOR DEPENDENCIES (PGVECTOR, RABBITMQ)
 ####################################################
-pgvector: # disabled anywhere but locally to test.
+# pgvector.enabled = true  → deploy the cloudpirates/postgres sub-chart (local dev)
+# pgvector.enabled = false → connect to an external PostgreSQL instance (dev/prod)
+pgvector:
   enabled: false
+  host: "some-cloud-service-dns"
+  port: 5432
+  batchSize: 100
+  auth:
+    username: "postgres"
+    database: "postgres"
+    # Password is managed by the auto-generated <release>-credentials secret.
+    # When the sub-chart is enabled, point it at the same secret so it initialises
+    # postgres with the same generated password:
+    #   existingSecret: "<release>-credentials"  ← set in your env values file
+    #   secretKeys:
+    #     adminPasswordKey: "postgres-password"
+    existingSecret: ""
+    secretKeys:
+      adminPasswordKey: "postgres-password"
 
-rabbitmq: #doc: https://artifacthub.io/packages/helm/bitnami/rabbitmq
+rabbitmq: #doc: https://artifacthub.io/packages/helm/cloudpirates-rabbitmq/rabbitmq
   enabled: true
   host: ""
   port: 5672
@@ -39,7 +58,14 @@ rabbitmq: #doc: https://artifacthub.io/packages/helm/bitnami/rabbitmq
   url: ""
   auth:
     username: "admin"
-    password: ""
+    # Password is managed by the auto-generated <release>-credentials secret.
+    # When the sub-chart is enabled, point it at the same secret:
+    #   existingSecret: "<release>-credentials"  ← set in your env values file
+    #   secretKeys:
+    #     passwordKey: "rabbitmq-password"
+    existingSecret: ""
+    secretKeys:
+      passwordKey: "rabbitmq-password"
 
 podAnnotations: {}
 podLabels: {}

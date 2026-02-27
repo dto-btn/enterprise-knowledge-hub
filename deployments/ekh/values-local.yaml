@@ -13,16 +13,19 @@ contentStorage:
 
 pgvector:
   enabled: true
-  # host: Kubernetes service is <release-name>-pgvector (set by alias in Chart.yaml)
-  # e.g. if your Helm release is "ekh": ekh-pgvector
-  host: "ekh-pgvector"
+  # host defaults to <release-name>-pgvector automatically — override only if needed
+  host: ""
   port: 5432
   batchSize: 100
-  # cloudpirates/postgres auth schema:
+  # Point the sub-chart at the auto-generated credentials secret so it initialises
+  # postgres with the same password the app will use.
+  # Secret name = <release>-credentials e.g. ekh-local-credentials
   auth:
     username: "postgres"
-    password: "changeme"
     database: "postgres"
+    existingSecret: "ekh-local-credentials"
+    secretKeys:
+      adminPasswordKey: "postgres-password"
   image:
     registry: docker.io
     repository: pgvector/pgvector
@@ -31,3 +34,11 @@ pgvector:
     scripts:
       init_pgvector.sql: |
         CREATE EXTENSION IF NOT EXISTS vector;
+
+# Point the rabbitmq sub-chart at the same credentials secret.
+# Secret name = <release>-credentials e.g. ekh-local-credentials
+rabbitmq:
+  auth:
+    existingSecret: "ekh-local-credentials"
+    secretKeys:
+      passwordKey: "rabbitmq-password"

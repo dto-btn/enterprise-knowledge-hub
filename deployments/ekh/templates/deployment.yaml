@@ -50,6 +50,10 @@ spec:
           env:
             - name: PYTORCH_ALLOC_CONF
               value: {{ .Values.pytorch.allocConf | quote }}
+            - name: PYTORCH_CUDA_GPU_CAP
+              value: {{ .Values.pytorch.cudaGpuCap | quote }}
+            - name: LLAMA_CUDA
+              value: {{ .Values.pytorch.llamaCuda | quote }}
             {{- with .Values.wikiEmbeddingModel }}
             - name: WIKIPEDIA_EMBEDDING_MODEL_BACKEND
               value: {{ .backend | quote }}
@@ -70,16 +74,22 @@ spec:
             - name: POSTGRES_DB
               value: {{ .auth.database | quote }}
             - name: POSTGRES_HOST
-              value: {{ .host | quote }}
+              value: {{ .host | default (printf "%s-pgvector" $.Release.Name) | quote }}
             - name: POSTGRES_PORT
               value: {{ .port | quote }}
-            - name: POSTGRES_BATCH_SIZE
-              value: {{ .batchSize | quote }}
             - name: POSTGRES_PASSWORD
-              value: {{ .auth.password | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ekh.credentialsSecretName" $ }}
+                  key: postgres-password
             {{- end }}
             - name: RABBITMQ_URL
               value: {{ .Values.rabbitmq.url | quote }}
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ekh.credentialsSecretName" . }}
+                  key: rabbitmq-password
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.contentStorage.enabled }}
