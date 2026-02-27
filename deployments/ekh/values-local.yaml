@@ -20,15 +20,9 @@ pgvector:
   host: ""
   port: 5432
   batchSize: 100
-  # Point the sub-chart at the auto-generated credentials secret so it initialises
-  # postgres with the same password the app will use.
-  # Secret name = <release>-credentials e.g. ekh-local-credentials
   auth:
     username: "postgres"
     database: "postgres"
-    existingSecret: "ekh-local-credentials"
-    secretKeys:
-      adminPasswordKey: "postgres-password"
   image:
     registry: docker.io
     repository: pgvector/pgvector
