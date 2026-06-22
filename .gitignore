@@ -208,3 +208,5 @@ __marimo__/
 deployments/ekh/charts/*.tgz
 
 config/logging.yaml
+
+.DS_Store

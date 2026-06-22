@@ -85,9 +85,9 @@ class KnowledgeWikipediaRepository(BaseRepository):
         query = (self.model.select().where(
                      (self.model.pid == pid) &
                      (self.model.source == source)
-                 ))
+                 ).order_by(self.model.chunk_index))
 
-        return query
+        return list(query)
 
     def get_by_pid_source_modified_date(self, pid: int, source: str,
                                         last_date_modified: datetime) -> KnowledgeBaseWikipedia | None:

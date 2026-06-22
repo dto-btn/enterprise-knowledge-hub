@@ -3,7 +3,7 @@ Endpoints for interacting with the knowledge database.
 """
 import logging
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from services.database.knowledge_item_service import KnowledgeItemService
 
 router = APIRouter()
@@ -30,6 +30,8 @@ def retrieve_wiki_articles(
     source: str = 'enwiki' # this needs to be fixed assume enwiki for now.
 ):
     """Get wiki article content"""
-    print("HELLO")
     print(f"(search_retrieve endpoints) Retrieving wiki articles for title: {title}")
-    return _knowledge_item_service.get_article_content_by_title(title, source)
+    result = _knowledge_item_service.get_article_content_by_title(title, source)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Article '{title}' not found")
+    return result

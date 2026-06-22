@@ -44,8 +44,12 @@ class KnowledgeItemService():
         # get pid of article then get all by pid?  feels like this can be combined.  revisit after refactoring
         article = self._repository.get_first_by_title_source(title, source)
 
-        result = self._repository.get_by_pid_source(article.pid, source)
-        return (result.name, result.content)
+        if article is None:
+            return None
+
+        chunks = self._repository.get_by_pid_source(article.pid, source)
+        combined_content = "\n\n".join(chunk.content for chunk in chunks)
+        return (article.name, combined_content)
 
     def delete_by_pid_source(self, pid: int, source: str) -> None:
         """Delete all records by PID and source"""

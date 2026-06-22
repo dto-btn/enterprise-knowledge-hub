@@ -6,6 +6,45 @@ Make sure you add this file to the root: `.env` (refer to `.env.example`)
 
 To start the docker container: `docker compose up -d`
 
+### Local preflight checklist
+
+Before running locally, verify these items first:
+
+- In `docker-compose.yml`, comment out the `ekh` service before starting local development.
+- In `.env`, replace container hostnames with localhost values when running outside Docker (for example `postgres-ekh` and `rabbitmq-ekh` should be `localhost`).
+- In `.env`, ensure the service passwords are set: `DB_PASSWORD`, `POSTGRES_PASSWORD`, `PGADMIN_DEFAULT_PASSWORD`, and the RabbitMQ credentials in `RABBITMQ_URL`.
+- In `main.py`, keep the cron decorator commented to prevent the scraper from running at startup:
+
+```python
+# @crons.cron(os.getenv("CRON_WIKIPEDIA_SCRAPE", "* * 1 * *"), name="run_knowledge_base_scraper")
+```
+
+- If you change the embedding model, update related model settings accordingly (for example max token length settings).
+
+#### Local embedding model: Mini LM
+
+For local development without GPU, the `sentence-transformers/all-MiniLM-L6-v2` model works well and is lightweight. Use these settings:
+
+```bash
+WIKIPEDIA_EMBEDDING_MODEL_BACKEND=SENTENCE_TRANSFORMER
+WIKIPEDIA_EMBEDDING_MODEL_CLEANUP=False
+WIKIPEDIA_EMBEDDING_MODEL_BATCH_SIZE=3
+WIKIPEDIA_EMBEDDING_MODEL_MAX_LENGTH=256
+WIKIPEDIA_EMBEDDING_MAX_DIMENSION=256
+WIKIPEDIA_PROCESS_BATCH_SIZE=6
+SENTENCE_TRANSFORMER_IS_CPU=True
+SENTENCE_TRANSFORMER_MODEL_NAME="sentence-transformers/all-MiniLM-L6-v2"
+PYTORCH_ALLOC_CONF="max_split_size_mb:256,garbage_collection_threshold:0.7,expandable_segments:False"
+MODEL_SHOW_PROGRESS=True
+```
+
+When using this configuration, remember to also update the embedding dimension in the other config files (see below).
+
+- Keep `WIKIPEDIA_EMBEDDING_MAX_DIMENSIONS` aligned in all three places:
+  - `.env`
+  - `deployments/ekh/sql/01_init_ekh_schema.sql` (`embedding VECTOR(...)`)
+  - `repository/knowledge_wikipedia_model.py` (`VectorField(dimensions=...)`)
+
 ### Files for KB implementation
 
 * Wikipedia; ensure you `mkdir wikipedia` within the `./content/` folder and drop your files there.
