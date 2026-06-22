@@ -35,7 +35,7 @@ flowchart TB
         unzip --> split["split xml into pages elements"]
         split --> validate["validate if article needs updating"]
         validate --> chunk["chunking of pages via tokenizer"]
-        chunk -->|WikipediaKnowledgeArticleChunk| fetch
+        chunk -->|WikipediaKnowledgeArticleChunk| emit_fetch
     end
 
     subgraph "Wikipedia Service Process"

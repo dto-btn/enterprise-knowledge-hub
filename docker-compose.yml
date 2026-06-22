@@ -51,8 +51,6 @@ services:
       - .env
     ports:
       - "8081:80"
-    mem_limit: 256m
-    memswap_limit: 512m
     depends_on:
       - postgres
   rabbitmq:
