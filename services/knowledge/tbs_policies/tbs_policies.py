@@ -20,6 +20,8 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
+from repository.knowledge_tbs_policies_model import KnowledgeBaseTBSPolicies
+from services.database.tbs_policy_item_service import TBSPolicyItemService
 from services.knowledge.base import KnowledgeService
 from services.knowledge.models import KnowledgeItem
 from services.knowledge.tbs_policies.models import TBSPolicyItemRaw, TBSPolicyItemProcessed
@@ -45,6 +47,7 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
         super().__init__(queue_service=queue_service, logger=logger,
                          run_history_service=run_history_service, service_name="tbs-policies")
         self._session: requests.Session | None = None
+        self._tbs_policy_service = TBSPolicyItemService(logger)
 
     @property
     def session(self) -> requests.Session:
@@ -79,8 +82,19 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
         for page_id in page_ids:
             try:
                 item = self._fetch_policy_page(page_id)
-                if item is not None:
-                    yield item
+                if item is None:
+                    continue
+
+                # Skip pages already stored with the same or newer last_modified_date
+                if self._tbs_policy_service.record_is_up_to_date(
+                    item.page_id, item.source, item.last_modified_date
+                ):
+                    self.logger.debug("Page id=%d (%s) is up to date, skipping.", page_id, item.name)
+                    continue
+
+                # Delete stale chunks before re-ingesting updated page
+                self._tbs_policy_service.delete_by_page_id_source(item.page_id, item.source)
+                yield item
             except Exception:
                 self.logger.exception("Failed to fetch TBS policy page id=%d, skipping.", page_id)
                 continue
@@ -244,10 +258,5 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
     def store_item(self, item: KnowledgeItem) -> None:
         """Store the processed item into the database."""
         validated = TBSPolicyItemProcessed.model_validate(item)
-        self.logger.debug("Storing TBS policy item: %s (page_id=%d, chunk=%d/%d)",
-                          validated.name, validated.page_id, validated.chunk_index, validated.chunk_count)
-        # NOTE: Repository/DB model for TBS policies to be implemented separately.
-        # For now this logs the store action. Wire up a KnowledgeBaseTBSPolicies model
-        # similar to KnowledgeBaseWikipedia when the DB table is ready.
-        self.logger.info("store_item called for page_id=%d chunk=%d — DB persistence pending implementation.",
-                         validated.page_id, validated.chunk_index)
+        record_to_insert = KnowledgeBaseTBSPolicies.from_item(validated)
+        self._tbs_policy_service.insert(record_to_insert.as_mapping())
