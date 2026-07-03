@@ -1,7 +1,7 @@
 """Unit tests for TBS policies page-fetching logic (isolated from DB, queue, embeddings).
 
-Run with -s to see live fetch output:
-    pytest tests/services/knowledge/test_tbs_policies_fetch.py -v -s
+Run live tests (real HTTP calls to TBS) with:
+    uv run -m pytest tests/services/knowledge/test_tbs_policies_fetch.py -v -s -k live
 """
 # pylint: disable=protected-access
 
