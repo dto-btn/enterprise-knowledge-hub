@@ -31,7 +31,7 @@ TBS_HIERARCHY_URL = "https://www.tbs-sct.canada.ca/pol/hierarch-eng.aspx"
 # Individual policy page URL template (HTML view)
 TBS_POLICY_PAGE_URL = "https://www.tbs-sct.canada.ca/pol/doc-eng.aspx?id={page_id}"
 
-# Regex to extract numeric page IDs from <li id="idXXXX"> elements
+# Regex to extract numeric page IDs from <a id="idXXXX"> elements
 _PAGE_ID_RE = re.compile(r"^id(\d+)$")
 
 # Polite delay between fetches (seconds)
@@ -103,15 +103,15 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
             time.sleep(_FETCH_DELAY)
 
     def _fetch_page_ids(self) -> list[int]:
-        """Fetch hierarchy page and extract all policy page IDs from <li id='idXXXX'> elements."""
+        """Fetch hierarchy page and extract all policy page IDs from <a id='idXXXX'> elements."""
         response = self.session.get(TBS_HIERARCHY_URL, timeout=_REQUEST_TIMEOUT)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "lxml")
 
         page_ids: list[int] = []
-        for li in soup.find_all("li", id=True):
-            match = _PAGE_ID_RE.match(li.get("id", ""))
+        for a in soup.find_all("a", id=True):
+            match = _PAGE_ID_RE.match(a.get("id", ""))
             if match:
                 page_ids.append(int(match.group(1)))
 
