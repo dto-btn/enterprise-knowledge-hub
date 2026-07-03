@@ -11,6 +11,7 @@ from provider.queue.rabbitmq import RabbitMQProvider
 from router.root.run_state import RunState
 from services.database.run_history_service import RunHistoryService
 from services.knowledge.wikipedia.wikipedia import WikipediaKnowledgeService
+from services.knowledge.tbs_policies.tbs_policies import TBSPoliciesKnowledgeService
 from services.queue.queue_service import QueueService
 
 load_dotenv()
@@ -28,6 +29,10 @@ _run_history_service = RunHistoryService(logger)
 _wikipedia_service = WikipediaKnowledgeService(queue_service=_queue_service, logger=logger,
                                                run_history_service=_run_history_service)
 _wikipedia_state = RunState()
+
+_tbs_policies_service = TBSPoliciesKnowledgeService(queue_service=_queue_service, logger=logger,
+                                                     run_history_service=_run_history_service)
+_tbs_policies_state = RunState()
 
 def _run_wikipedia_task(run_id: int | None = None):
     """Wrapper that manages the running state flag."""
@@ -65,5 +70,46 @@ def wikipedia_run(background_tasks: BackgroundTasks, run_id: int | None = None):
     background_tasks.add_task(_run_wikipedia_task, run_id)
     return {
         "message": "Wikipedia run started.",
+        "details": "Follow progress at frontend/status"
+    }
+
+# ── TBS Policies ──────────────────────────────────────────────────────────────
+
+def _run_tbs_policies_task(run_id: int | None = None):
+    """Wrapper that manages the running state flag."""
+    try:
+        _tbs_policies_service.run(run_id)
+    finally:
+        _tbs_policies_state.stop()
+
+@router.get("/tbs-policies/stop")
+async def stop_tbs_policies_run():
+    """
+    Endpoint to stop current TBS policies running process
+    """
+    if not _tbs_policies_state.is_running():
+        return {"message": "No TBS policies run is currently in progress"}
+
+    run_id = _tbs_policies_service.request_stop()
+    _tbs_policies_state.stop()
+    return {"message": "Stop event requested for current TBS policies run",
+            "run_id": run_id}
+
+@router.get("/tbs-policies/run")
+def tbs_policies_run(background_tasks: BackgroundTasks, run_id: int | None = None):
+    """
+    Endpoint to trigger TBS policies full run.
+    Fetches policies from the TBS hierarchy, chunks, embeds, and stores them.
+    Optional run_id to manually override the computed run_id.
+    """
+    if not _tbs_policies_state.try_start():
+        return {
+            "message": "TBS policies run already in progress.",
+            "details": "Follow progress at frontend/status"
+        }
+
+    background_tasks.add_task(_run_tbs_policies_task, run_id)
+    return {
+        "message": "TBS policies run started.",
         "details": "Follow progress at frontend/status"
     }
