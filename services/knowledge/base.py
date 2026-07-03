@@ -170,7 +170,6 @@ class KnowledgeService(ABC):
         Return: bool is meant to tell QueueWorker to ack or not
         """
         self.process_item(item)
-        self.emit_processed_item(item)
         self.logger.debug("DeliveryTag: %s", delivery_tag)
 
         # this is to tell queueworker to handle ack
