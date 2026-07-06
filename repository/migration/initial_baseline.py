@@ -14,6 +14,12 @@ def run_init_migration(db: PostgresqlDatabase):
                    ON kb_wikipedia USING ivfflat (embedding vector_cosine_ops) WITH (lists = 3464);
                    """)
     db.execute_sql("""
+                   CREATE INDEX IF NOT EXISTS documents_name_idx ON kb_wikipedia (name);
+                   """)
+    db.execute_sql("""
+                   CREATE INDEX IF NOT EXISTS documents_source_idx ON kb_wikipedia (source);
+                   """)
+    db.execute_sql("""
                    CREATE INDEX IF NOT EXISTS tbs_policies_embedding_index
                    ON kb_tbs_policies USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
                    """)
