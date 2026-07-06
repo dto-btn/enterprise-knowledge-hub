@@ -46,9 +46,8 @@ MODEL_SHOW_PROGRESS=True
 
 When using this configuration, remember to also update the embedding dimension in the other config files (see below).
 
-- Keep `WIKIPEDIA_EMBEDDING_MAX_DIMENSIONS` aligned in all three places:
+- Keep `WIKIPEDIA_EMBEDDING_MAX_DIMENSIONS` aligned in all places:
   - `.env`
-  - `deployments/ekh/sql/01_init_ekh_schema.sql` (`embedding VECTOR(...)`)
   - `repository/knowledge_wikipedia_model.py` (`VectorField(dimensions=...)`)
 
 ### Files for KB implementation
@@ -66,11 +65,7 @@ To manual test the cronjob, visit the /crons/{job_name}/run endpoint (MORE INFO 
 
 ### Database Setup
 
-```bash
-docker exec -it postgres-ekh psql -U admin -d rag
-```
-
-On first run **ensure you have this table created**, please see setup section in [database documentation](docs/database.md#setup).
+## On first run, migration files will run via PeeWee.  
 
 ### Running locally
 
