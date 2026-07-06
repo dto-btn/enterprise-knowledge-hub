@@ -65,7 +65,8 @@ To manual test the cronjob, visit the /crons/{job_name}/run endpoint (MORE INFO 
 
 ### Database Setup
 
-## On first run, migration files will run via PeeWee.  
+- On first run, migration files will run via PeeWee.  
+- For historical records for reference = [database documentation](docs/database.md#setup) 
 
 ### Running locally
 
