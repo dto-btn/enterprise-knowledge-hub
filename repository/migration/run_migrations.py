@@ -1,4 +1,7 @@
-"""Python file for migration runs through pipeline"""
+"""Python file for migration runs through pipeline
+   For now we will use just migrations on app startup, using lifecycle.
+   if it gets frequent enought, we'll move to pipeline.
+"""
 import logging
 
 from repository.database import db, initialize_database
