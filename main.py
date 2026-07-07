@@ -72,7 +72,7 @@ if os.getenv("CRON_WIKIPEDIA_RUN", "true").lower() in ("1", "true", "yes"):
     )(run_knowledge_base_scraper)
 
 @app.get("/health")
-def hp():
+def health_check():
     """Health check endpoint."""
     return {"status": "Healthy"}
 

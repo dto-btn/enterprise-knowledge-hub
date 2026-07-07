@@ -50,47 +50,57 @@ HIERARCHY_HTML = """
 </body></html>
 """
 
+# Mirrors the real TBS page structure: <main class="container"> containing a sidebar
+# (pol-sb) and the numbered policy body in <div id="ps-doc">.
 POLICY_PAGE_HTML = """
 <html><head>
   <meta name="dcterms.modified" content="2025-06-15"/>
 </head><body>
 <main class="container">
-  <h1>Policy on Service and Digital</h1>
-  <p>This policy outlines the requirements for the management of service delivery,
-     information, data, information technology, and cyber security in the Government
-     of Canada. It supports a modern and digital government.</p>
-  <p>Section 4.1 — The objective of this policy is to ensure that the government's
-     service delivery is client-centric by design.</p>
+  <h1 id="wb-cont" property="name">Policy on Service and Digital</h1>
+  <section class="pol-sb">
+    <h2>Supporting tools</h2>
+    <ul><li><a href="#">Sidebar link — should not appear in extracted content</a></li></ul>
+  </section>
+  <div id="ps-doc">
+    <div class="pol-content">
+      <p>This policy outlines the requirements for the management of service delivery,
+         information, data, information technology, and cyber security in the Government
+         of Canada. It supports a modern and digital government.</p>
+      <p>Section 4.1 — The objective of this policy is to ensure that the government's
+         service delivery is client-centric by design.</p>
+    </div>
+  </div>
 </main>
-<dl id="wb-dtmd">
-  <dt>Date modified:</dt>
-  <dd><time property="dateModified">2025-06-15</time></dd>
-</dl>
 <footer>Site footer</footer>
 </body></html>
 """
 
-POLICY_PAGE_MINIMAL_HTML = """
-<html><body>
-<article>
-  <h1>Short Doc</h1>
-  <p>Too short.</p>
-</article>
-</body></html>
-"""
-
+# No dcterms.modified meta — exercises the <dt>/<dd> fallback date extraction.
 POLICY_PAGE_WITH_DATE_DL = """
 <html><body>
 <main class="container">
   <h1>Directive on Open Government</h1>
-  <p>This directive establishes requirements for the release of information and data
-     under the Government of Canada's commitment to transparent operations.</p>
-  <p>Departments must publish their information assets in machine-readable formats.</p>
+  <div id="ps-doc">
+    <p>This directive establishes requirements for the release of information and data
+       under the Government of Canada's commitment to transparent operations.</p>
+    <p>Departments must publish their information assets in machine-readable formats.</p>
+  </div>
 </main>
 <dl id="wb-dtmd">
   <dt>Date modified:</dt>
   <dd><time property="dateModified">2024-03-01</time></dd>
 </dl>
+</body></html>
+"""
+
+# Content inside ps-doc is intentionally too short to pass the 50-char minimum.
+POLICY_PAGE_MINIMAL_HTML = """
+<html><body>
+<main class="container">
+  <h1>Short Doc</h1>
+  <div id="ps-doc"><p>Too short.</p></div>
+</main>
 </body></html>
 """
 
@@ -150,7 +160,7 @@ class TestTBSPoliciesFetch(unittest.TestCase):
     # ── _fetch_policy_page ────────────────────────────────────────────────────
 
     def test_fetch_policy_page_parses_content_and_metadata(self):
-        """Should extract title, content, and last modified from a well-formed policy page."""
+        """Should extract title, content from ps-doc, and last modified from dcterms.modified meta."""
         svc = self._build_service()
 
         mock_response = MagicMock()
@@ -165,11 +175,13 @@ class TestTBSPoliciesFetch(unittest.TestCase):
         self.assertEqual(item.page_id, 99999)
         self.assertEqual(item.source, "tbs-policies")
         self.assertIn("client-centric", item.content)
-        # last_modified from <meta name="dcterms.modified">
+        # Sidebar content must be excluded — ps-doc selector isolates the policy body
+        self.assertNotIn("Sidebar link", item.content)
+        # Date from <meta name="dcterms.modified">
         self.assertEqual(item.last_modified_date, datetime(2025, 6, 15))
 
     def test_fetch_policy_page_extracts_date_from_dl(self):
-        """Should extract last modified date from <dt>Date modified</dt> / <dd><time>."""
+        """Should fall back to <dt>Date modified</dt>/<dd><time> when dcterms.modified meta is absent."""
         svc = self._build_service()
 
         mock_response = MagicMock()
@@ -182,8 +194,41 @@ class TestTBSPoliciesFetch(unittest.TestCase):
         self.assertIsNotNone(item)
         self.assertEqual(item.last_modified_date, datetime(2024, 3, 1))
 
+    def test_fetch_policy_page_dcterms_meta_takes_priority_over_dt(self):
+        """dcterms.modified meta must win over a conflicting <dt>/<dd> date."""
+        svc = self._build_service()
+
+        html = """
+        <html><head>
+          <meta name="dcterms.modified" content="2025-01-01"/>
+        </head><body>
+        <main class="container">
+          <h1>Conflicting Dates Policy</h1>
+          <div id="ps-doc">
+            <p>Content that is long enough to exceed the fifty character minimum check applied
+               during ingestion so this item is not skipped by the length guard.</p>
+          </div>
+        </main>
+        <dl id="wb-dtmd">
+          <dt>Date modified:</dt>
+          <dd><time property="dateModified">2017-08-24</time></dd>
+        </dl>
+        </body></html>
+        """
+
+        mock_response = MagicMock()
+        mock_response.text = html
+        mock_response.raise_for_status = MagicMock()
+        svc.session.get = MagicMock(return_value=mock_response)
+
+        item = svc._fetch_policy_page(88888)
+
+        self.assertIsNotNone(item)
+        # dcterms.modified (2025-01-01) must win over the dt/dd footer date (2017-08-24)
+        self.assertEqual(item.last_modified_date, datetime(2025, 1, 1))
+
     def test_fetch_policy_page_skips_short_content(self):
-        """Should return None when content is too short (< 50 chars)."""
+        """Should return None when ps-doc content is too short (< 50 chars)."""
         svc = self._build_service()
 
         mock_response = MagicMock()
@@ -209,18 +254,20 @@ class TestTBSPoliciesFetch(unittest.TestCase):
         self.assertIsNone(item)
 
     def test_fetch_policy_page_strips_scripts_and_nav(self):
-        """Should remove <script>, <style>, <nav>, <header>, <footer> from content."""
+        """Should remove <script>, <style>, <nav>, <header>, <footer> from extracted content."""
         svc = self._build_service()
 
         html = """
         <html><body>
         <main class="container">
           <h1>Clean Policy</h1>
-          <script>alert('xss')</script>
-          <nav><a href="/">Home</a></nav>
-          <p>This is the actual policy content that should remain visible after parsing
-             and should be long enough to pass the minimum length filter easily.</p>
-          <style>.hidden { display: none; }</style>
+          <div id="ps-doc">
+            <script>alert('xss')</script>
+            <nav><a href="/">Home</a></nav>
+            <p>This is the actual policy content that should remain visible after parsing
+               and should be long enough to pass the minimum length filter easily.</p>
+            <style>.hidden { display: none; }</style>
+          </div>
         </main>
         </body></html>
         """

@@ -139,20 +139,13 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
         title_tag = soup.find("h1")
         title = title_tag.get_text(strip=True) if title_tag else f"Policy {page_id}"
 
-        # Extract main content from the policy document body.
-        # TBS policy pages typically have a main content area.
-        # Try common content containers used on canada.ca / TBS pages.
+        # TBS policy pages place the numbered policy body in <div id="ps-doc">.
+        # Fall back to <main> (the outer page container), then <body> as a last resort.
         content_area = (
-            soup.find("div", class_="field-item")
-            or soup.find("main", id="wb-cont")
-            or soup.find("div", id="wb-cont")
-            or soup.find("article")
+            soup.find("div", id="ps-doc")
             or soup.find("main")
+            or soup.find("body")
         )
-
-        if content_area is None:
-            self.logger.warning("No content area found for page id=%d (%s). Using body.", page_id, title)
-            content_area = soup.find("body")
 
         if content_area is None:
             self.logger.warning("Empty page for id=%d, skipping.", page_id)
@@ -181,7 +174,15 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
 
     def _extract_last_modified(self, soup: BeautifulSoup) -> datetime | None:
         """Try to extract a last modified date from the page metadata."""
-        # canada.ca pages often have <time> or <dl> with "Date modified"
+        # <meta name="dcterms.modified"> carries the policy's own effective date — check first.
+        meta = soup.find("meta", attrs={"name": "dcterms.modified"})
+        if meta and meta.get("content"):
+            try:
+                return datetime.strptime(meta["content"], "%Y-%m-%d")
+            except ValueError:
+                pass
+
+        # Fallback: <dt>Date modified</dt> / <dd><time> pattern used on older canada.ca pages.
         date_modified_dl = soup.find("dt", string=re.compile(r"Date modified", re.IGNORECASE))
         if date_modified_dl:
             dd = date_modified_dl.find_next_sibling("dd")
@@ -192,14 +193,6 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
                     return datetime.strptime(text, "%Y-%m-%d")
                 except ValueError:
                     pass
-
-        # Fallback: meta tag
-        meta = soup.find("meta", attrs={"name": "dcterms.modified"})
-        if meta and meta.get("content"):
-            try:
-                return datetime.strptime(meta["content"], "%Y-%m-%d")
-            except ValueError:
-                pass
 
         return None
 

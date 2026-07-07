@@ -39,7 +39,7 @@ class KnowledgeItemService():
 
     def get_article_content_by_title(self, title: str, source: str) -> str:
         """Get article content based on title and source"""
-        print(f"Getting article content (all chunks) for title: {title}")
+        self._logger.info("Retrieving article chunks for title=%r source=%r", title, source)
 
         # get pid of article then get all by pid?  feels like this can be combined.  revisit after refactoring
         article = self._repository.get_first_by_title_source(title, source)

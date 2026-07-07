@@ -18,6 +18,13 @@ class TBSPolicyItemService:
         self._logger = logger
         self._repository = KnowledgeTBSPoliciesRepository()
 
+    def search(self, query: str, limit: int = 10) -> list:
+        """Search TBS policies by query embedding (asymmetric retrieval)."""
+        from provider.embedding.qwen3.embedder_factory import get_embedder
+        embedder = get_embedder()
+        query_embedding = embedder.embed(query, is_query=True)
+        return self._repository.search_by_embedding(query_embedding, limit)
+
     def insert(self, row: dict) -> KnowledgeBaseTBSPolicies:
         """Insert a record."""
         return self._repository.create(
