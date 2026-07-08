@@ -6,9 +6,16 @@ import numpy as np
 
 from provider.embedding.tokenizer import ThreadTokenizer
 
-# Qwen3 embedding models require instruction prefixes for queries
-# See: https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
-QWEN3_QUERY_INSTRUCTION = "Instruct: Given a query, retrieve relevant Wikipedia passages that answer the query\nQuery: "
+# Default Qwen3 query instruction — used as a fallback when no source-specific
+# instruction is provided.  The query endpoint uses the instruction stored in
+# kb_source_registry so this constant is only a safety net.
+QWEN3_DEFAULT_QUERY_INSTRUCTION = (
+    "Instruct: Given a query, retrieve relevant passages that answer the query\nQuery: "
+)
+
+# Keep the old name as an alias so existing callers don't break.
+QWEN3_QUERY_INSTRUCTION = QWEN3_DEFAULT_QUERY_INSTRUCTION
+
 
 class EmbeddingBackendProvider(ABC):
     """Contract for embedding providers to implement."""
@@ -21,14 +28,22 @@ class EmbeddingBackendProvider(ABC):
     batch_size: int = 32
 
     @abstractmethod
-    def embed(self, text: Any, is_query: bool = False) -> np.ndarray:
+    def embed(
+        self,
+        text: Any,
+        is_query: bool = False,
+        instruction: str | None = None,
+    ) -> np.ndarray:
         """Generate embeddings for text.
 
         Args:
             text: The text to embed.
-            is_query: If True, prepend query instruction for asymmetric retrieval.
-                     Documents should be embedded with is_query=False.
-                     Queries should be embedded with is_query=True.
+            is_query: If True and no instruction is given, prepend the default
+                      query instruction (backward-compat fallback).
+            instruction: Task-specific instruction prefix.  When provided it
+                         takes priority over is_query and is prepended verbatim.
+                         Retrieve from kb_source_registry at query time so the
+                         instruction always matches what was used at ingest.
         """
         raise NotImplementedError
 

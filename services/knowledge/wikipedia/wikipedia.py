@@ -18,7 +18,7 @@ from wikitextparser import remove_markup
 
 from provider.embedding.qwen3.embedder_factory import get_embedder
 from repository.knowledge_wikipedia_model import KnowledgeBaseWikipedia
-from services.database.knowledge_item_service import KnowledgeItemService
+from services.database.knowledge_item_service import WikipediaArticleService
 from services.knowledge.base import KnowledgeService
 from services.knowledge.batch_handler import BatchHandler
 from services.knowledge.models import KnowledgeItem
@@ -49,11 +49,17 @@ class WikipediaKnowledgeService(KnowledgeService):
     def __init__(self, queue_service, logger, run_history_service):
         super().__init__(queue_service=queue_service, logger=logger,
                          run_history_service=run_history_service, service_name="wikipedia")
-        self._knowledge_wikipedia_service = KnowledgeItemService(logger)
+        self._knowledge_wikipedia_service = WikipediaArticleService(logger)
         self._batch_handler_instance = None
         interval = int(os.getenv("PROCESSING_BATCH_AVERAGE_INTERVAL", "20"))
         self.batch_time_tracker = BatchTimeTracker(interval, self._run_id, self.service_name,
                                                    logger, run_history_service)
+
+    def get_query_instruction(self) -> str:
+        return (
+            "Instruct: Given a query, retrieve relevant Wikipedia passages that answer the query\n"
+            "Query: "
+        )
 
     @property
     def embedder(self):

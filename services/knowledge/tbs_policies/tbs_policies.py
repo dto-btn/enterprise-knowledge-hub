@@ -49,6 +49,13 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
         self._session: requests.Session | None = None
         self._tbs_policy_service = TBSPolicyItemService(logger)
 
+    def get_query_instruction(self) -> str:
+        return (
+            "Instruct: Given a query, retrieve relevant Government of Canada policy and directive "
+            "passages that answer the query\n"
+            "Query: "
+        )
+
     @property
     def session(self) -> requests.Session:
         """Lazy-initialized requests session with common headers."""
