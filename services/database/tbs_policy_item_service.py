@@ -3,6 +3,7 @@ from datetime import datetime
 import logging
 from dataclasses import dataclass
 
+from provider.embedding.qwen3.embedder_factory import get_embedder
 from repository.knowledge_tbs_policies_model import KnowledgeBaseTBSPolicies
 from repository.knowledge_tbs_policies import KnowledgeTBSPoliciesRepository
 
@@ -18,11 +19,14 @@ class TBSPolicyItemService:
         self._logger = logger
         self._repository = KnowledgeTBSPoliciesRepository()
 
+    @property
+    def embedder(self):
+        """Get embedder (lazy GPU init on first call)."""
+        return get_embedder()
+
     def search(self, query: str, limit: int = 10) -> list:
         """Search TBS policies by query embedding (asymmetric retrieval)."""
-        from provider.embedding.qwen3.embedder_factory import get_embedder
-        embedder = get_embedder()
-        query_embedding = embedder.embed(query, is_query=True)
+        query_embedding = self.embedder.embed(query, is_query=True)
         return self._repository.search_by_embedding(query_embedding, limit)
 
     def insert(self, row: dict) -> KnowledgeBaseTBSPolicies:

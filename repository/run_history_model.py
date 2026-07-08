@@ -2,7 +2,6 @@
 from datetime import datetime
 
 from peewee import AutoField, IntegerField, TextField, Model
-from playhouse.postgres_ext import BinaryJSONField, JSONField
 from repository.base_model import TimestampTZField
 from repository.database import db
 

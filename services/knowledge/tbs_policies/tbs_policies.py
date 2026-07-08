@@ -200,8 +200,8 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
 
     def emit_fetched_item(self, item: TBSPolicyItemRaw) -> None:
         """Chunk the raw item and write chunks to the ingest queue."""
-        # Import embedder lazily to avoid GPU init during ingest-only runs
-        from provider.embedding.qwen3.embedder_factory import get_embedder
+        # Lazy import: avoids GPU initialisation during ingest-only runs
+        from provider.embedding.qwen3.embedder_factory import get_embedder  # pylint: disable=import-outside-toplevel
         embedder = get_embedder()
 
         max_tokens = getattr(embedder, "max_seq_length", None)
@@ -222,8 +222,8 @@ class TBSPoliciesKnowledgeService(KnowledgeService):
 
     def process_item(self, knowledge_item: KnowledgeItem) -> None:
         """Process a single item — compute embeddings and emit to processed queue."""
-        from provider.embedding.qwen3.embedder_factory import get_embedder
-        import numpy as np
+        from provider.embedding.qwen3.embedder_factory import get_embedder  # pylint: disable=import-outside-toplevel
+        import numpy as np  # pylint: disable=import-outside-toplevel
 
         embedder = get_embedder()
         content = knowledge_item['content'] if isinstance(knowledge_item, dict) else knowledge_item.content
