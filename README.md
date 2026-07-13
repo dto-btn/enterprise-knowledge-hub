@@ -242,7 +242,7 @@ queue processing.
 
 ## Releasing versions
 
-Versions can be released via the Release mechanism in [GitHub]().
+Versions can be released via the Release mechanism in [GitHub](https://github.com/dto-btn/enterprise-knowledge-hub/releases).
 
 Before you should update the version in `pyproject.toml` and `uv lock && uv sync` which is handled by this one simple command: 
 
