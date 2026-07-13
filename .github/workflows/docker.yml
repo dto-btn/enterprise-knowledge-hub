@@ -13,7 +13,7 @@ env:
 
 jobs:
   build-cpu:
-    runs-on: arc-ssc-dsai
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -62,7 +62,7 @@ jobs:
 
   # Build for h100/h200 series
   build-cuda-h100-h200:
-    runs-on: arc-ssc-dsai
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -116,7 +116,7 @@ jobs:
 
   # Build for l40 series
   build-cuda-l40:
-    runs-on: arc-ssc-dsai
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
