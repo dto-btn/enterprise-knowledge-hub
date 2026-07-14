@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/ssc-dsai/enterprise-knowledge-hub.git
+    repoURL: https://github.com/dto-btn/enterprise-knowledge-hub.git
     targetRevision: main
     path: deployments/ekh
     helm:

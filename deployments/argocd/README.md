@@ -1,6 +1,9 @@
 # ArgoCD Application definition
 
-This is the folder where I am testing application definitions but the real location of reference for those are here:
+This folder contains the ArgoCD Application definitions used to deploy the Enterprise Knowledge Hub. These are now self-contained in this repository (previously split across the `ssc-dsai-iac` infrastructure repositories):
 
-* [ThinkON NON-Production](https://github.com/ssc-dsai-iac/canchat-thinkon-non-prod)
-* [ThinkON Production](https://github.com/ssc-dsai-iac/canchat-thinkon-prod)
+* `application.yaml` - base Application definition.
+* `local-application.yaml` - local/minikube Application, using `deployments/ekh/values-local.yaml`.
+* `dev-application.yaml` - AKS dev environment Application, using `deployments/ekh/values-dev.yaml`.
+
+There is currently no production environment configured; it will be added here once available.
