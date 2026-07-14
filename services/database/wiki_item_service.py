@@ -34,6 +34,10 @@ class WikipediaArticleService():
         combined_content = "\n\n".join(chunk.content for chunk in chunks)
         return (article.name, combined_content)
 
+    def search_by_embedding(self, embedding: list[float], limit: int = 100) -> list[dict]:
+        """Semantic search over kb_wikipedia by embedding similarity."""
+        return self._repository.search_by_embedding(embedding, limit=limit)
+
     def delete_by_pid_source(self, pid: int, source: str) -> None:
         """Delete all records by PID and source"""
         self._repository.delete_by_pid_source(pid, source)

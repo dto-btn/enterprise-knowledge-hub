@@ -18,7 +18,7 @@ from wikitextparser import remove_markup
 
 from provider.embedding.qwen3.embedder_factory import get_embedder
 from repository.knowledge_wikipedia_model import KnowledgeBaseWikipedia
-from services.database.knowledge_item_service import WikipediaArticleService
+from services.database.wiki_item_service import WikipediaArticleService
 from services.knowledge.base import KnowledgeService
 from services.knowledge.batch_handler import BatchHandler
 from services.knowledge.models import KnowledgeItem

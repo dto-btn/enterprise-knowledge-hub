@@ -30,6 +30,10 @@ class TBSPolicyItemService:
             source=row['source'],
         )
 
+    def search_by_embedding(self, embedding: list[float], limit: int = 100) -> list[dict]:
+        """Semantic search over kb_tbs_policies by embedding similarity."""
+        return self._repository.search_by_embedding(embedding, limit=limit)
+
     def delete_by_page_id_source(self, page_id: int, source: str) -> None:
         """Delete all chunks for a page_id and source."""
         self._repository.delete_by_page_id_source(page_id, source)
