@@ -1,19 +1,17 @@
 """
-Knowledge item service to handle operations related to knowledge items, such as searching, retrieving content, and
-managing records in the database.
+Wikipedia article service — retrieval and persistence operations for kb_wikipedia.
 """
 from datetime import datetime
 import logging
 from dataclasses import dataclass
 
-from provider.embedding.qwen3.embedder_factory import get_embedder
 from repository.knowledge_wikipedia_model import KnowledgeBaseWikipedia
 from repository.knowledge_wikipedia import KnowledgeWikipediaRepository
 
 
 @dataclass
-class KnowledgeItemService():
-    """Service to query wiki embeddings"""
+class WikipediaArticleService():
+    """Service to retrieve and manage Wikipedia knowledge items."""
 
     logger: logging.Logger
     _repository: KnowledgeWikipediaRepository
@@ -22,24 +20,9 @@ class KnowledgeItemService():
         self._logger = logger
         self._repository = KnowledgeWikipediaRepository()
 
-    @property
-    def embedder(self):
-        """Get embedder"""
-        return get_embedder()
-
-    def search(self, query: str, limit: int =10) -> list[KnowledgeBaseWikipedia]:
-        """Search Wikipedia articles by query embedding."""
-        # Use is_query=True to apply the Qwen3 query instruction prefix
-        # This is critical for asymmetric retrieval (query vs document)
-        query_embedding = self.embedder.embed(query, is_query=True)
-        results = self._repository.search_by_embedding(query_embedding, limit, probes=150)
-        #results = self._repository.search_by_embedding(query_embedding, min_similarity=0.8, probes=60)
-
-        return results
-
     def get_article_content_by_title(self, title: str, source: str) -> str:
         """Get article content based on title and source"""
-        print(f"Getting article content (all chunks) for title: {title}")
+        self._logger.info("Retrieving article chunks for title=%r source=%r", title, source)
 
         # get pid of article then get all by pid?  feels like this can be combined.  revisit after refactoring
         article = self._repository.get_first_by_title_source(title, source)
@@ -50,6 +33,10 @@ class KnowledgeItemService():
         chunks = self._repository.get_by_pid_source(article.pid, source)
         combined_content = "\n\n".join(chunk.content for chunk in chunks)
         return (article.name, combined_content)
+
+    def search_by_embedding(self, embedding: list[float], limit: int = 100) -> list[dict]:
+        """Semantic search over kb_wikipedia by embedding similarity."""
+        return self._repository.search_by_embedding(embedding, limit=limit)
 
     def delete_by_pid_source(self, pid: int, source: str) -> None:
         """Delete all records by PID and source"""

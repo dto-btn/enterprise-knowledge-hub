@@ -8,14 +8,17 @@ image:
 imagePullSecrets: []
 
 env:
+  embedding:
+    modelBackend: "SENTENCE_TRANSFORMER"
+    modelCleanup: false
+    modelBatchSize: 3
+    modelMaxLength: 4096
+    dimensions: 512
+    modelDtype: "float16"
+    isRngMode: false
+    rngSeed: 17
   wikipedia:
-    embeddingModelBackend: "SENTENCE_TRANSFORMER"
-    embeddingModelCleanup: false
-    embeddingModelBatchSize: 3
-    embeddingModelMaxLength: 4096
-    embeddingModelMaxDim: 512
-    debugExtraction: false #extract ingested on disk (as xml)
-    embeddingModelDtype: "float16"
+    debugExtraction: false #extract ingested xml on disk (wikipedia-specific)
   pytorch:
     allocConf: "max_split_size_mb:256,garbage_collection_threshold:0.7,expandable_segments:False"
     cudaGpuCap: 0.8
