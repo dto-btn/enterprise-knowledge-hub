@@ -1,22 +1,22 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: ekh-local
-  namespace: argocd
+  name: ekh-dev
+  namespace: ekh-dev
 spec:
   project: default
   source:
     repoURL: https://github.com/dto-btn/enterprise-knowledge-hub.git
-    #targetRevision: HEAD
-    targetRevision: feat-helm-charts
+    targetRevision: main
     path: deployments/ekh
     helm:
+      releaseName: dev
       valueFiles:
         - values.yaml
-        - values-local.yaml
+        - values-dev.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: ekh-local
+    namespace: ekh-dev
   syncPolicy:
     automated:
       prune: true

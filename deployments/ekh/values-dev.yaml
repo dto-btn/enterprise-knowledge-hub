@@ -11,11 +11,12 @@ env:
   wikipedia:
     embeddingModelBackend: "SENTENCE_TRANSFORMER"
     embeddingModelCleanup: false
-    embeddingModelBatchSize: 3
+    embeddingModelBatchSize: 64
     embeddingModelMaxLength: 4096
     embeddingModelMaxDim: 512
     debugExtraction: false #extract ingested on disk (as xml)
     embeddingModelDtype: "float16"
+    processBatchSize: 256
   pytorch:
     allocConf: "max_split_size_mb:256,garbage_collection_threshold:0.7,expandable_segments:False"
     cudaGpuCap: 0.8
@@ -87,7 +88,7 @@ tolerations: []
 affinity: {}
 
 contentStorage:
-  enabled: false
+  enabled: true
   size: 250Gi
   accessModes:
     - ReadWriteMany
