@@ -244,6 +244,6 @@ queue processing.
 
 Versions can be released via the Release mechanism in [GitHub](https://github.com/dto-btn/enterprise-knowledge-hub/releases).
 
-Before you should update the version in `pyproject.toml` and `uv lock && uv sync` which is handled by this one simple command: 
+Before releasing a new version, you should update the `<version>` tag in `pyproject.toml` and run `uv lock && uv sync` which is handled by this one simple command: 
 
 `uv version 1.2.6`
