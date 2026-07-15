@@ -15,9 +15,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential ca-certificates curl git python3.12 python3.12-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Install GoC intermediate and root CA certs so curl/uv can reach external hosts
+# through the PSPC-SSC Cloud-Nuage TLS inspection proxy on SSC runners.
+# ADD https:// is fetched by BuildKit on the host (bypasses container cert store),
+# so uv must be installed via RUN curl which runs after these certs are trusted.
+COPY certs/ /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+
 # Install UV (build stage only - not carried to runtime)
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
-RUN sh /uv-installer.sh && rm /uv-installer.sh
+RUN curl -fsSL https://astral.sh/uv/install.sh -o /uv-installer.sh \
+    && sh /uv-installer.sh \
+    && rm /uv-installer.sh
 
 ENV UV_NO_DEV=1
 ENV UV_PYTHON_PREFERENCE=only-system
@@ -46,11 +54,15 @@ RUN export MAX_JOBS=${JOBS_AND_THREADS} && \
 FROM python:3.12-trixie AS builder-cpu
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential ca-certificates git \
+        build-essential ca-certificates curl git \
     && rm -rf /var/lib/apt/lists/*
 
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
-RUN sh /uv-installer.sh && rm /uv-installer.sh
+COPY certs/ /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+
+RUN curl -fsSL https://astral.sh/uv/install.sh -o /uv-installer.sh \
+    && sh /uv-installer.sh \
+    && rm /uv-installer.sh
 
 ENV UV_NO_DEV=1
 ENV UV_PYTHON_PREFERENCE=only-system
@@ -83,6 +95,11 @@ ARG BASE_IMAGE
 FROM runtime-${BASE_IMAGE} AS final
 
 WORKDIR /app
+
+# Carry the proxy CA cert (and the full updated bundle) from the builder
+# so the running application can also make TLS calls through the ICM proxy.
+COPY --from=builder /usr/local/share/ca-certificates/ /usr/local/share/ca-certificates/
+COPY --from=builder /etc/ssl/certs/ /etc/ssl/certs/
 
 # Copy only the pre-built virtual environment from the appropriate builder.
 # Nothing else from the builder (UV cache, build tools, CUDA devel files,
