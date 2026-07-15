@@ -2,6 +2,10 @@
 # BASE_IMAGE: "cpu" or "cuda" - selects which base image to use
 ARG BASE_IMAGE=cpu
 
+# GoC Root-A cert — injected before uv sync so TLS interception (ICM) does not break the build
+ARG GOC_ROOT_A_URL="https://raw.githubusercontent.com/gccloudone-aurora-collab/goc-root-cert-mirror/main/certs/GoC-GdC-Root-A.crt"
+ARG GOC_ROOT_A_FINGERPRINT="FE:E0:9E:77:43:BF:D4:3E:D7:D4:D3:ED:50:6C:C7:9D:2D:90:70:FF:A9:29:91:16:87:D4:27:33:70:BE:A3:06"
+
 # ── CUDA builder ───────────────────────────────────────────────────────────────
 # nvidia/cuda devel image is needed to compile flash-attn; it is NOT used at runtime.
 FROM nvidia/cuda:12.9.1-cudnn-devel-ubuntu24.04 AS builder-cuda
@@ -12,8 +16,16 @@ ARG JOBS_AND_THREADS=8
 ARG BUILD_FLASH=FALSE
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential ca-certificates curl git python3.12 python3.12-dev \
+        build-essential ca-certificates curl git openssl python3.12 python3.12-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Inject GoC Root-A cert so uv sync can reach PyPI through the ICM proxy
+ARG GOC_ROOT_A_URL
+ARG GOC_ROOT_A_FINGERPRINT
+RUN curl -fsSL --insecure "${GOC_ROOT_A_URL}" \
+        -o /usr/local/share/ca-certificates/GoC-GdC-Root-A.crt \
+    && test "$(openssl x509 -in /usr/local/share/ca-certificates/GoC-GdC-Root-A.crt -noout -sha256 -fingerprint | cut -d= -f2)" = "${GOC_ROOT_A_FINGERPRINT}" \
+    && update-ca-certificates
 
 # Install UV (build stage only - not carried to runtime)
 ADD https://astral.sh/uv/install.sh /uv-installer.sh
@@ -46,8 +58,16 @@ RUN export MAX_JOBS=${JOBS_AND_THREADS} && \
 FROM python:3.12-trixie AS builder-cpu
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential ca-certificates git \
+        build-essential ca-certificates curl git openssl \
     && rm -rf /var/lib/apt/lists/*
+
+# Inject GoC Root-A cert so uv sync can reach PyPI through the ICM proxy
+ARG GOC_ROOT_A_URL
+ARG GOC_ROOT_A_FINGERPRINT
+RUN curl -fsSL --insecure "${GOC_ROOT_A_URL}" \
+        -o /usr/local/share/ca-certificates/GoC-GdC-Root-A.crt \
+    && test "$(openssl x509 -in /usr/local/share/ca-certificates/GoC-GdC-Root-A.crt -noout -sha256 -fingerprint | cut -d= -f2)" = "${GOC_ROOT_A_FINGERPRINT}" \
+    && update-ca-certificates
 
 ADD https://astral.sh/uv/install.sh /uv-installer.sh
 RUN sh /uv-installer.sh && rm /uv-installer.sh
@@ -83,6 +103,11 @@ ARG BASE_IMAGE
 FROM runtime-${BASE_IMAGE} AS final
 
 WORKDIR /app
+
+# Carry the GoC Root-A cert (and the full updated bundle) from the builder
+# so the running application can make TLS calls through the ICM proxy.
+COPY --from=builder /usr/local/share/ca-certificates/ /usr/local/share/ca-certificates/
+COPY --from=builder /etc/ssl/certs/ /etc/ssl/certs/
 
 # Copy only the pre-built virtual environment from the appropriate builder.
 # Nothing else from the builder (UV cache, build tools, CUDA devel files,
