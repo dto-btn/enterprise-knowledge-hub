@@ -20,15 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GOC-GDC-ISSUING-A1A cert on runner
-        run: |
-          
-          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
-          sudo update-ca-certificates
-          sudo mkdir -p /etc/docker/certs.d/ghcr.io
-          
-          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
-
       - name: Extract version from pyproject.toml
         id: version
         shell: bash
@@ -47,6 +38,15 @@ jobs:
             echo "Tag version (${TAG_VERSION}) does not match pyproject.toml version (${{ steps.version.outputs.version }})."
             exit 1
           fi
+
+      - name: Install GoC CA cert and restart Docker
+        run: |
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
+          sudo update-ca-certificates
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
+          sudo systemctl restart docker
+          sleep 5
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -80,15 +80,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GOC-GDC-ISSUING-A1A cert on runner
-        run: |
-          
-          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
-          sudo update-ca-certificates
-          sudo mkdir -p /etc/docker/certs.d/ghcr.io
-          
-          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
-
       - name: Extract version from pyproject.toml
         id: version
         shell: bash
@@ -108,8 +99,19 @@ jobs:
             exit 1
           fi
 
+      - name: Install GoC CA cert and restart Docker
+        run: |
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
+          sudo update-ca-certificates
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
+          sudo systemctl restart docker
+          sleep 5
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
@@ -143,15 +145,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GOC-GDC-ISSUING-A1A cert on runner
-        run: |
-          
-          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
-          sudo update-ca-certificates
-          sudo mkdir -p /etc/docker/certs.d/ghcr.io
-          
-          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
-
       - name: Extract version from pyproject.toml
         id: version
         shell: bash
@@ -171,8 +164,19 @@ jobs:
             exit 1
           fi
 
+      - name: Install GoC CA cert and restart Docker
+        run: |
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
+          sudo update-ca-certificates
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
+          sudo systemctl restart docker
+          sleep 5
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
