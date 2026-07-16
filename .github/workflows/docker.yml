@@ -12,11 +12,34 @@ env:
   JOBS_AND_THREADS: 16 # 8 workers would run this job in 30 ish minute (flash-attn lib build)
 
 jobs:
-  build-cpu:
+  build:
+    name: Build ${{ matrix.label }} image
     runs-on: [self-hosted, ssc-dto]
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: CPU
+            base_image: cpu
+            cuda_arch: ""
+            build_flash: "FALSE"
+            platforms: linux/amd64,linux/arm64
+            tag_suffix: ""
+          - label: CUDA H100/H200
+            base_image: cuda
+            cuda_arch: "9.0"
+            build_flash: "TRUE"
+            platforms: linux/amd64
+            tag_suffix: "-cuda-9.0"
+          - label: CUDA L40
+            base_image: cuda
+            cuda_arch: "8.9"
+            build_flash: "FALSE"
+            platforms: linux/amd64
+            tag_suffix: "-cuda-8.9"
     steps:
       - uses: actions/checkout@v4
 
@@ -39,130 +62,36 @@ jobs:
             exit 1
           fi
 
+      - name: Install GoC CA cert
+        run: |
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/ca.crt
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+        with:
+          config-inline: |
+            [registry."ghcr.io"]
+              ca=["/etc/docker/certs.d/ghcr.io/ca.crt"]
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push CPU image
-        uses: docker/build-push-action@v5
+      - name: Build and push image
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
-          build-args: BASE_IMAGE=cpu
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}
-
-  # Build for h100/h200 series
-  build-cuda-h100-h200:
-    runs-on: [self-hosted, ssc-dto]
-    permissions:
-      contents: read
-      packages: write
-    env:
-      CUDA_ARCH: "9.0" # h100/h200
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Extract version from pyproject.toml
-        id: version
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION=$(grep -m1 '^version' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Validate tag matches pyproject version
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [ "${TAG_VERSION}" != "${{ steps.version.outputs.version }}" ]; then
-            echo "Tag version (${TAG_VERSION}) does not match pyproject.toml version (${{ steps.version.outputs.version }})."
-            exit 1
-          fi
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push CUDA image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
+          platforms: ${{ matrix.platforms }}
           build-args: |
-            BASE_IMAGE=cuda
-            CUDA_ARCH=${{ env.CUDA_ARCH }}
+            BASE_IMAGE=${{ matrix.base_image }}
+            CUDA_ARCH=${{ matrix.cuda_arch }}
             JOBS_AND_THREADS=${{ env.JOBS_AND_THREADS }}
-            BUILD_FLASH=TRUE
+            BUILD_FLASH=${{ matrix.build_flash }}
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.version }}-cuda-${{ env.CUDA_ARCH }}
-            ${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}-cuda-${{ env.CUDA_ARCH }}
-
-  # Build for l40 series
-  build-cuda-l40:
-    runs-on: [self-hosted, ssc-dto]
-    permissions:
-      contents: read
-      packages: write
-    env:
-      CUDA_ARCH: "8.9" #l40, etc.
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Extract version from pyproject.toml
-        id: version
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION=$(grep -m1 '^version' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Validate tag matches pyproject version
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [ "${TAG_VERSION}" != "${{ steps.version.outputs.version }}" ]; then
-            echo "Tag version (${TAG_VERSION}) does not match pyproject.toml version (${{ steps.version.outputs.version }})."
-            exit 1
-          fi
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push CUDA image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          build-args: |
-            BASE_IMAGE=cuda
-            CUDA_ARCH=${{ env.CUDA_ARCH }}
-            JOBS_AND_THREADS=${{ env.JOBS_AND_THREADS }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.version }}-cuda-${{ env.CUDA_ARCH }}
-            ${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}-cuda-${{ env.CUDA_ARCH }}
+            ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.version }}${{ matrix.tag_suffix }}
+            ${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}${{ matrix.tag_suffix }}
