@@ -8,7 +8,7 @@ import torch.cuda
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
-from provider.embedding.base import EmbeddingBackendProvider, QWEN3_QUERY_INSTRUCTION
+from provider.embedding.base import EmbeddingBackendProvider, QWEN3_DEFAULT_QUERY_INSTRUCTION
 from provider.embedding.rng_embedder import RNGEmbedder
 from provider.embedding.tokenizer import ThreadTokenizer
 
@@ -34,11 +34,11 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         os.environ.setdefault("PYTORCH_ALLOC_CONF",
                               "max_split_size_mb:128,garbage_collection_threshold:0.6,expandable_segments:False")
 
-        dtype_env = os.getenv("WIKIPEDIA_EMBEDDING_MODEL_DTYPE", "float16").lower()
+        dtype_env = os.getenv("EMBEDDING_MODEL_DTYPE", "float16").lower()
         dtype_map = {"float16": torch.float16, "float32": torch.float32}
         dtype = dtype_map.get(dtype_env, torch.float16)
         if dtype_env not in dtype_map:
-            self.logger.warning("Invalid WIKIPEDIA_EMBEDDING_MODEL_DTYPE '%s', defaulting to float16", dtype_env)
+            self.logger.warning("Invalid EMBEDDING_MODEL_DTYPE '%s', defaulting to float16", dtype_env)
 
         # Prefer float32 on MPS for stability
         if torch.backends.mps.is_available():
@@ -68,9 +68,9 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
             tokenizer_kwargs={"padding_side": "left"},
         )
 
-        self.dimensions = int(os.getenv("WIKIPEDIA_EMBEDDING_MAX_DIMENSION", "256"))
-        self.max_seq_length = self.model.max_seq_length = int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_MAX_LENGTH", "4096"))
-        self.use_rng_embedding = os.getenv("WIKIPEDIA_EMBEDDING_IS_RNG_MODE", "false").lower() in ("1", "true", "yes")
+        self.dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", "512"))
+        self.max_seq_length = self.model.max_seq_length = int(os.getenv("EMBEDDING_MODEL_MAX_LENGTH", "4096"))
+        self.use_rng_embedding = os.getenv("EMBEDDING_IS_RNG_MODE", "false").lower() in ("1", "true", "yes")
         if self.use_rng_embedding:
             self.rng_embedder = RNGEmbedder(self.dimensions)
 
@@ -79,28 +79,33 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         self.logger.debug("Model loaded on device: %s", self.model.device)
         self.logger.debug("Model max sequence length: %d", self.model.max_seq_length)
 
-        self.batch_size = int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_BATCH_SIZE", "1"))
+        self.batch_size = int(os.getenv("EMBEDDING_MODEL_BATCH_SIZE", "1"))
 
     def embed(
         self,
         text: list[str],
         is_query: bool = False,
-        dim: int = int(os.getenv("WIKIPEDIA_EMBEDDING_MAX_DIMENSION", "512")),
+        instruction: str | None = None,
+        dim: int = int(os.getenv("EMBEDDING_DIMENSIONS", "512")),
     ) -> np.ndarray:
         """Generate embeddings for text, chunking when necessary.
 
         Args:
             text: The text to embed.
-            is_query: If True, prepend query instruction for asymmetric retrieval.
+            is_query: Backward-compat flag. Ignored when instruction is provided.
+            instruction: Task-specific instruction prefix (from kb_source_registry).
+                         Takes priority over is_query when set.
             dim: The dimension to truncate embeddings to.
         """
 
         if self.use_rng_embedding:
             return self.rng_embedder.encode(text)
 
-        # For queries, prepend the instruction prefix
-        if is_query:
-            text = QWEN3_QUERY_INSTRUCTION + text
+        # Prepend instruction: explicit value wins, then is_query fallback
+        if instruction is not None:
+            text = instruction + text
+        elif is_query:
+            text = QWEN3_DEFAULT_QUERY_INSTRUCTION + text
 
         # Encode the string chunks
         embeddings = self.model.encode(
@@ -113,7 +118,7 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
         )
 
         # Aggressive cleanup for MPS
-        if os.getenv("WIKIPEDIA_EMBEDDING_MODEL_CLEANUP", "False").lower() == "true":
+        if os.getenv("EMBEDDING_MODEL_CLEANUP", "False").lower() == "true":
             self.logger.debug("Performing aggressive cleanup of model resources")
             if torch.backends.mps.is_available():
                 torch.mps.empty_cache()
@@ -124,7 +129,7 @@ class Qwen3SentenceTransformer(EmbeddingBackendProvider):
 
     def get_batch_size(self) -> int:
         """Return embedding batch size."""
-        return int(os.getenv("WIKIPEDIA_EMBEDDING_MODEL_BATCH_SIZE", "1"))
+        return int(os.getenv("EMBEDDING_MODEL_BATCH_SIZE", "1"))
 
     def chunk_text_by_tokens(self, text: str, max_tokens: int = None, overlap_tokens: int = 10) -> list[str]:
         """Split text into chunks based on token count with overlap."""

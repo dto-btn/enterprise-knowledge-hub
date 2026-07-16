@@ -11,7 +11,7 @@ class RNGEmbedder:
 
     def __init__(self, embedding_dim: int):
         self.embedding_dim = embedding_dim
-        self.global_seed = int(os.getenv("WIKIPEDIA_RNG_SEED", "0"))
+        self.global_seed = int(os.getenv("EMBEDDING_RNG_SEED", "0"))
 
     @staticmethod
     def hash_to_uint32(text: str) -> int:

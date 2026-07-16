@@ -4,13 +4,19 @@
 
 Make sure you add this file to the root: `.env` (refer to `.env.example`)
 
-To start the docker container: `docker compose up -d`
+To start all services (including EKH): `docker compose up -d`
+
+To start only the infrastructure (Postgres, RabbitMQ, pgAdmin) for local development:
+
+```bash
+docker compose up -d postgres rabbitmq pgadmin
+```
 
 ### Local preflight checklist
 
 Before running locally, verify these items first:
 
-- In `docker-compose.yml`, comment out the `ekh` service before starting local development.
+- Start only the infrastructure services: `docker compose up -d postgres rabbitmq pgadmin` (no need to comment out the `ekh` service).
 - In `.env`, replace container hostnames with localhost values when running outside Docker (for example `postgres-ekh` and `rabbitmq-ekh` should be `localhost`).
 - In `.env`, ensure the service passwords are set: `DB_PASSWORD`, `POSTGRES_PASSWORD`, `PGADMIN_DEFAULT_PASSWORD`, and the RabbitMQ credentials in `RABBITMQ_URL`.
 - In `main.py`, keep the cron decorator commented to prevent the scraper from running at startup:
@@ -40,9 +46,8 @@ MODEL_SHOW_PROGRESS=True
 
 When using this configuration, remember to also update the embedding dimension in the other config files (see below).
 
-- Keep `WIKIPEDIA_EMBEDDING_MAX_DIMENSIONS` aligned in all three places:
+- Keep `WIKIPEDIA_EMBEDDING_MAX_DIMENSIONS` aligned in all places:
   - `.env`
-  - `deployments/ekh/sql/01_init_ekh_schema.sql` (`embedding VECTOR(...)`)
   - `repository/knowledge_wikipedia_model.py` (`VectorField(dimensions=...)`)
 
 ### Files for KB implementation
@@ -60,11 +65,8 @@ To manual test the cronjob, visit the /crons/{job_name}/run endpoint (MORE INFO 
 
 ### Database Setup
 
-```bash
-docker exec -it postgres-ekh psql -U admin -d rag
-```
-
-On first run **ensure you have this table created**, please see setup section in [database documentation](docs/database.md#setup).
+- On first run, migration files will run via PeeWee.  
+- For historical records for reference = [database documentation](docs/database.md#setup) 
 
 ### Running locally
 

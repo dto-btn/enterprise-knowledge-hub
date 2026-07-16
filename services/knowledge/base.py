@@ -9,6 +9,7 @@ import logging
 import threading
 from datetime import datetime
 
+from services.database.kb_source_registry_service import KbSourceRegistryService
 from services.database.run_history_service import RunHistoryService
 from services.knowledge.models import KnowledgeItem
 from services.knowledge.models import RunStatus
@@ -30,8 +31,45 @@ class KnowledgeService(ABC):
     _executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=3)
     _futures: list[Future] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        self._source_registry_service = KbSourceRegistryService()
+
+    @abstractmethod
+    def get_query_instruction(self) -> str:
+        """Return the task-specific Qwen3 instruction prefix for query embedding.
+
+        This string is stored in kb_source_registry at ingest time and retrieved
+        by the query endpoint to ensure the query is embedded identically to the
+        stored document vectors (asymmetric retrieval).
+
+        Example:
+            "Instruct: Given a query, retrieve relevant Wikipedia passages\\nQuery: "
+        """
+        raise NotImplementedError
+
+    def _register_source_metadata(self) -> None:
+        """Update kb_source_registry with the current ingest-time model config."""
+        try:
+            model_name = os.getenv("SENTENCE_TRANSFORMER_MODEL_NAME", "Qwen/Qwen3-Embedding-0.6B")
+            dimensions = int(os.getenv("EMBEDDING_DIMENSIONS", "512"))
+            self._source_registry_service.register(
+                source=self.service_name,
+                model_name=model_name,
+                dimensions=dimensions,
+                query_instruction=self.get_query_instruction(),
+            )
+            self.logger.info("Source registry updated for '%s' (model=%s, dim=%d).",
+                             self.service_name, model_name, dimensions)
+        except Exception:  # pylint: disable=broad-except
+            self.logger.exception(
+                "Failed to update source registry for '%s' — continuing run.", self.service_name
+            )
+
     def run(self, run_id: int | None = None) -> None:
         """Run the knowledge ingestion/processing in parallel threads."""
+        # Register source metadata so the query endpoint can resolve the correct
+        # model and instruction without any hard-coded per-source knowledge.
+        self._register_source_metadata()
 
         if run_id is None:
             # Assign a random run ID for tracking in logs and stats
@@ -170,7 +208,6 @@ class KnowledgeService(ABC):
         Return: bool is meant to tell QueueWorker to ack or not
         """
         self.process_item(item)
-        self.emit_processed_item(item)
         self.logger.debug("DeliveryTag: %s", delivery_tag)
 
         # this is to tell queueworker to handle ack
