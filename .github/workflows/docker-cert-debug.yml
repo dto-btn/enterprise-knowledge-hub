@@ -1,0 +1,106 @@
+name: Docker cert debug
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  debug-ghcr-push:
+    runs-on: [self-hosted, ssc-dto]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GoC CA cert
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/ca.crt
+          sudo chmod 0644 /etc/docker/certs.d/ghcr.io/ca.crt
+          openssl x509 -in /etc/docker/certs.d/ghcr.io/ca.crt -noout -subject -issuer -sha256 -fingerprint
+
+      - name: Show ghcr.io TLS chain seen by runner
+        run: |
+          set -euo pipefail
+          openssl s_client -connect ghcr.io:443 -servername ghcr.io -showcerts </dev/null 2>/dev/null \
+            | awk '
+                /BEGIN CERTIFICATE/ { cert++; file=sprintf("cert-%02d.pem", cert); printing=1 }
+                printing { print > file }
+                /END CERTIFICATE/ { printing=0; close(file) }
+              '
+          for cert in cert-*.pem; do
+            echo "== ${cert} =="
+            openssl x509 -in "${cert}" -noout -subject -issuer -sha256 -fingerprint || true
+          done
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-flags: --debug
+          config-inline: |
+            [registry."ghcr.io"]
+              ca=["/etc/docker/certs.d/ghcr.io/ca.crt"]
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create tiny scratch image context
+        run: |
+          set -euo pipefail
+          mkdir -p .cert-debug
+          printf 'cert debug run %s attempt %s\n' "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" > .cert-debug/cert-debug.txt
+          cat > .cert-debug/Dockerfile <<'EOF'
+          FROM scratch
+          COPY cert-debug.txt /cert-debug.txt
+          EOF
+
+      - name: BuildKit push tiny image
+        id: buildkit_push
+        continue-on-error: true
+        uses: docker/build-push-action@v7
+        with:
+          context: .cert-debug
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}:cert-debug-buildkit-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Compare with host Docker push
+        id: host_push
+        if: steps.buildkit_push.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}:cert-debug-host-${{ github.run_id }}-${{ github.run_attempt }}"
+          docker build --platform linux/amd64 -t "${IMAGE}" .cert-debug
+          docker push "${IMAGE}"
+
+      - name: Dump BuildKit diagnostics
+        if: steps.buildkit_push.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          docker buildx ls || true
+          docker buildx inspect --bootstrap || true
+          docker ps -a --filter "name=buildx_buildkit" || true
+          for container in $(docker ps -aq --filter "name=buildx_buildkit"); do
+            echo "== logs for ${container} =="
+            docker logs "${container}" || true
+          done
+
+      - name: Fail if BuildKit push failed
+        if: steps.buildkit_push.outcome == 'failure'
+        run: |
+          echo "BuildKit push failed. Host Docker push outcome: ${{ steps.host_push.outcome }}"
+          exit 1
