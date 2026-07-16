@@ -15,10 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential ca-certificates curl git python3.12 python3.12-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install GoC intermediate and root CA certs so curl/uv can reach external hosts
-# through the PSPC-SSC Cloud-Nuage TLS inspection proxy on SSC runners.
-# ADD https:// is fetched by BuildKit on the host (bypasses container cert store),
-# so uv must be installed via RUN curl which runs after these certs are trusted.
+# Install the GOC-GDC-ISSUING-A1A cert — it directly signed the PSPC-SSC
+# Cloud-Nuage SSL Proxy CA, so trusting it validates the full TLS chain on
+# SSC runners. Use RUN curl (not ADD https://) so it runs after this trust step.
 COPY certs/ /usr/local/share/ca-certificates/
 RUN update-ca-certificates
 

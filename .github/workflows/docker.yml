@@ -20,6 +20,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install GOC-GDC-ISSUING-A1A cert on runner
+        run: |
+          
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
+          sudo update-ca-certificates
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
+
       - name: Extract version from pyproject.toml
         id: version
         shell: bash
@@ -70,6 +79,15 @@ jobs:
       CUDA_ARCH: "9.0" # h100/h200
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install GOC-GDC-ISSUING-A1A cert on runner
+        run: |
+          
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
+          sudo update-ca-certificates
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
 
       - name: Extract version from pyproject.toml
         id: version
@@ -124,6 +142,15 @@ jobs:
       CUDA_ARCH: "8.9" #l40, etc.
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install GOC-GDC-ISSUING-A1A cert on runner
+        run: |
+          
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /usr/local/share/ca-certificates/
+          sudo update-ca-certificates
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          
+          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/
 
       - name: Extract version from pyproject.toml
         id: version
