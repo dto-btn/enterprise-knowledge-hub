@@ -8,6 +8,10 @@ import numpy as np
 from repository.base_model import BaseEmbeddingModel, VectorField
 from services.knowledge.wikipedia.models import WikipediaItemProcessed
 
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 KB_TABLE_NAME = "kb_wikipedia"
 
 class KnowledgeBaseWikipedia(BaseEmbeddingModel): #pylint: disable=too-many-instance-attributes
@@ -16,7 +20,7 @@ class KnowledgeBaseWikipedia(BaseEmbeddingModel): #pylint: disable=too-many-inst
     chunk_index: int = IntegerField()
     name: str = TextField()
     content: str = TextField()
-    embedding: list[float] = VectorField(dimensions=512)
+    embedding: list[float] = VectorField(dimensions=int(os.getenv("EMBEDDING_DIMENSIONS", 512)))
     source: str | None = TextField(null=True)
 
     #Computed field.  Not in table

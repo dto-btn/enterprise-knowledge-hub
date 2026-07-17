@@ -8,6 +8,10 @@ import numpy as np
 from repository.base_model import BaseEmbeddingModel, VectorField
 from services.knowledge.tbs_policies.models import TBSPolicyItemProcessed
 
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 KB_TABLE_NAME = "kb_tbs_policies"
 
 
@@ -17,7 +21,7 @@ class KnowledgeBaseTBSPolicies(BaseEmbeddingModel):
     chunk_index: int = IntegerField()
     name: str = TextField()
     content: str = TextField()
-    embedding: list[float] = VectorField(dimensions=512)
+    embedding: list[float] = VectorField(dimensions=int(os.getenv("EMBEDDING_DIMENSIONS", 512)))
     source: str | None = TextField(null=True)
 
     # Computed field. Not in table
