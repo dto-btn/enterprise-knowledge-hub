@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 from dotenv import load_dotenv
-load_dotenv()
 
 from torch import Tensor
 from peewee import SQL, IntegerField, TextField
@@ -12,7 +11,7 @@ import numpy as np
 from repository.base_model import BaseEmbeddingModel, VectorField
 from services.knowledge.tbs_policies.models import TBSPolicyItemProcessed
 
-
+load_dotenv()
 
 KB_TABLE_NAME = "kb_tbs_policies"
 
