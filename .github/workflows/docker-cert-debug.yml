@@ -22,8 +22,9 @@ jobs:
         run: |
           set -euo pipefail
           sudo mkdir -p /etc/docker/certs.d/ghcr.io
-          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/ca.crt
+          awk '1' certs/GOC-GDC-ROOT-A.crt certs/GOC-GDC-ISSUING-A1A.crt | sudo tee /etc/docker/certs.d/ghcr.io/ca.crt > /dev/null
           sudo chmod 0644 /etc/docker/certs.d/ghcr.io/ca.crt
+          openssl crl2pkcs7 -nocrl -certfile /etc/docker/certs.d/ghcr.io/ca.crt | openssl pkcs7 -print_certs -noout
           openssl x509 -in /etc/docker/certs.d/ghcr.io/ca.crt -noout -subject -issuer -sha256 -fingerprint
 
       - name: Show ghcr.io TLS chain seen by runner
@@ -44,7 +45,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
         with:
           buildkitd-flags: --debug
-          config-inline: |
+          buildkitd-config-inline: |
             [registry."ghcr.io"]
               ca=["/etc/docker/certs.d/ghcr.io/ca.crt"]
 
