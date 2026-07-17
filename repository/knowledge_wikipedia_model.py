@@ -31,6 +31,12 @@ class KnowledgeBaseWikipedia(BaseEmbeddingModel): #pylint: disable=too-many-inst
                 'UNIQUE (pid, source, chunk_index)'
             )
         ]
+        indexes = [
+            SQL('CREATE INDEX IF NOT EXISTS wikipedia_embedding_index '
+                'ON kb_wikipedia USING ivfflat (embedding vector_cosine_ops) WITH (lists = 3464); '),
+            SQL('CREATE INDEX IF NOT EXISTS documents_name_idx ON kb_wikipedia (name);'),
+            SQL('CREATE INDEX IF NOT EXISTS documents_source_idx ON kb_wikipedia (source);'),
+        ]
 
     @classmethod
     def from_item(cls, item: WikipediaItemProcessed) -> KnowledgeBaseWikipedia:

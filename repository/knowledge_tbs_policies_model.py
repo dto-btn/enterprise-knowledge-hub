@@ -32,6 +32,10 @@ class KnowledgeBaseTBSPolicies(BaseEmbeddingModel):
                 'UNIQUE (page_id, source, chunk_index)'
             )
         ]
+        indexes = [
+            SQL('CREATE INDEX IF NOT EXISTS tbs_policies_embedding_index '
+                'ON kb_tbs_policies USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);'),
+        ]
 
     @classmethod
     def from_item(cls, item: TBSPolicyItemProcessed) -> KnowledgeBaseTBSPolicies:
