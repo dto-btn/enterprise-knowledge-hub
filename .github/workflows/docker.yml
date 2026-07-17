@@ -64,13 +64,14 @@ jobs:
 
       - name: Install GoC CA cert
         run: |
+          set -euo pipefail
           sudo mkdir -p /etc/docker/certs.d/ghcr.io
-          sudo cp certs/GOC-GDC-ISSUING-A1A.crt /etc/docker/certs.d/ghcr.io/ca.crt
+          awk '1' certs/GOC-GDC-ROOT-A.crt certs/GOC-GDC-ISSUING-A1A.crt | sudo tee /etc/docker/certs.d/ghcr.io/ca.crt > /dev/null
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
         with:
-          config-inline: |
+          buildkitd-config-inline: |
             [registry."ghcr.io"]
               ca=["/etc/docker/certs.d/ghcr.io/ca.crt"]
 
