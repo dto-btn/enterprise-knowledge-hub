@@ -1,12 +1,17 @@
 """Persistence models forknowledge base, defining the structure of records stored in the database and providing"""
 from __future__ import annotations
 
+import os
+from dotenv import load_dotenv
+
 from torch import Tensor
 from peewee import SQL, IntegerField, TextField
 import numpy as np
 
 from repository.base_model import BaseEmbeddingModel, VectorField
 from services.knowledge.wikipedia.models import WikipediaItemProcessed
+
+load_dotenv()
 
 KB_TABLE_NAME = "kb_wikipedia"
 
@@ -16,7 +21,7 @@ class KnowledgeBaseWikipedia(BaseEmbeddingModel): #pylint: disable=too-many-inst
     chunk_index: int = IntegerField()
     name: str = TextField()
     content: str = TextField()
-    embedding: list[float] = VectorField(dimensions=512)
+    embedding: list[float] = VectorField(dimensions=int(os.getenv("EMBEDDING_DIMENSIONS", str(512))))
     source: str | None = TextField(null=True)
 
     #Computed field.  Not in table
@@ -30,6 +35,12 @@ class KnowledgeBaseWikipedia(BaseEmbeddingModel): #pylint: disable=too-many-inst
                 'CONSTRAINT documents_pid_source_chunk_index_key '
                 'UNIQUE (pid, source, chunk_index)'
             )
+        ]
+        indexes = [
+            SQL('CREATE INDEX IF NOT EXISTS wikipedia_embedding_index '
+                'ON kb_wikipedia USING ivfflat (embedding vector_cosine_ops) WITH (lists = 3464); '),
+            SQL('CREATE INDEX IF NOT EXISTS documents_name_idx ON kb_wikipedia (name);'),
+            SQL('CREATE INDEX IF NOT EXISTS documents_source_idx ON kb_wikipedia (source);'),
         ]
 
     @classmethod

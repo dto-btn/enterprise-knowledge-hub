@@ -1,12 +1,17 @@
 """Persistence model for TBS policies knowledge base."""
 from __future__ import annotations
 
+import os
+from dotenv import load_dotenv
+
 from torch import Tensor
 from peewee import SQL, IntegerField, TextField
 import numpy as np
 
 from repository.base_model import BaseEmbeddingModel, VectorField
 from services.knowledge.tbs_policies.models import TBSPolicyItemProcessed
+
+load_dotenv()
 
 KB_TABLE_NAME = "kb_tbs_policies"
 
@@ -17,7 +22,7 @@ class KnowledgeBaseTBSPolicies(BaseEmbeddingModel):
     chunk_index: int = IntegerField()
     name: str = TextField()
     content: str = TextField()
-    embedding: list[float] = VectorField(dimensions=512)
+    embedding: list[float] = VectorField(dimensions=int(os.getenv("EMBEDDING_DIMENSIONS", str(512))))
     source: str | None = TextField(null=True)
 
     # Computed field. Not in table
@@ -31,6 +36,10 @@ class KnowledgeBaseTBSPolicies(BaseEmbeddingModel):
                 'CONSTRAINT tbs_policies_page_id_source_chunk_index_key '
                 'UNIQUE (page_id, source, chunk_index)'
             )
+        ]
+        indexes = [
+            SQL('CREATE INDEX IF NOT EXISTS tbs_policies_embedding_index '
+                'ON kb_tbs_policies USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);'),
         ]
 
     @classmethod
