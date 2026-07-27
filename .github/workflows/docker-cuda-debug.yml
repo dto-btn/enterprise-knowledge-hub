@@ -1,0 +1,148 @@
+name: Docker CUDA debug
+
+on:
+  workflow_dispatch:
+    inputs:
+      cuda_arch:
+        description: CUDA architecture to build
+        type: choice
+        default: "9.0"
+        options:
+          - "9.0"
+          - "8.9"
+      build_flash:
+        description: Build flash-attn extra
+        type: boolean
+        default: true
+      push_image:
+        description: Push debug image to GHCR
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - ".github/workflows/docker-cuda-debug.yml"
+      - ".github/workflows/docker.yml"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "certs/**"
+  push:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/docker-cuda-debug.yml"
+      - ".github/workflows/docker.yml"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "certs/**"
+
+env:
+  REGISTRY: ghcr.io
+  JOBS_AND_THREADS: 8
+
+jobs:
+  cuda-debug:
+    name: CUDA debug ${{ github.event.inputs.cuda_arch || '9.0' }}
+    runs-on: [self-hosted, ssc-dto]
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select debug inputs
+        id: inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "cuda_arch=${{ github.event.inputs.cuda_arch || '9.0' }}" >> "$GITHUB_OUTPUT"
+          echo "build_flash=${{ github.event.inputs.build_flash || 'true' }}" >> "$GITHUB_OUTPUT"
+          echo "push_image=${{ github.event.inputs.push_image || 'false' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Show runner diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== runner =="
+          uname -a
+          id
+          echo "== cpu =="
+          nproc
+          lscpu || true
+          echo "== memory =="
+          free -h || true
+          echo "== disk =="
+          df -h /
+          df -h /var/lib/docker || true
+          echo "== docker =="
+          docker version
+          docker info
+          echo "== buildx =="
+          docker buildx version
+          docker buildx ls || true
+
+      - name: Install GoC CA cert
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /etc/docker/certs.d/ghcr.io
+          awk '1' certs/GOC-GDC-ROOT-A.crt certs/GOC-GDC-ISSUING-A1A.crt | sudo tee /etc/docker/certs.d/ghcr.io/ca.crt > /dev/null
+          openssl x509 -in certs/GOC-GDC-ROOT-A.crt -noout -subject -issuer -sha256 -fingerprint
+          openssl x509 -in certs/GOC-GDC-ISSUING-A1A.crt -noout -subject -issuer -sha256 -fingerprint
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-flags: --debug
+          buildkitd-config-inline: |
+            [registry."ghcr.io"]
+              ca=["/etc/docker/certs.d/ghcr.io/ca.crt"]
+
+      - name: Log in to GitHub Container Registry
+        if: steps.inputs.outputs.push_image == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build CUDA image
+        id: cuda_build
+        continue-on-error: true
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ steps.inputs.outputs.push_image == 'true' }}
+          load: ${{ steps.inputs.outputs.push_image != 'true' }}
+          platforms: linux/amd64
+          build-args: |
+            BASE_IMAGE=cuda
+            CUDA_ARCH=${{ steps.inputs.outputs.cuda_arch }}
+            JOBS_AND_THREADS=${{ env.JOBS_AND_THREADS }}
+            BUILD_FLASH=${{ steps.inputs.outputs.build_flash == 'true' && 'TRUE' || 'FALSE' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}:cuda-debug-${{ steps.inputs.outputs.cuda_arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Dump post-build diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== docker disk usage =="
+          docker system df -v || true
+          echo "== running containers =="
+          docker ps -a || true
+          echo "== buildx state =="
+          docker buildx ls || true
+          docker buildx inspect --bootstrap || true
+          echo "== buildkit logs =="
+          for container in $(docker ps -aq --filter "name=buildx_buildkit"); do
+            echo "== logs for ${container} =="
+            docker logs --tail 300 "${container}" || true
+          done
+
+      - name: Fail if CUDA build failed
+        if: steps.cuda_build.outcome == 'failure'
+        run: exit 1
