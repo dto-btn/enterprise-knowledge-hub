@@ -9,12 +9,13 @@ on:
 env:
   IMAGE_NAME: enterprise-knowledge-hub
   REGISTRY: ghcr.io
-  JOBS_AND_THREADS: 16 # 8 workers would run this job in 30 ish minute (flash-attn lib build)
+  JOBS_AND_THREADS: 8 # match the self-hosted runner's 8 CPU cores; oversubscribing slows the flash-attn compile down
 
 jobs:
   build:
     name: Build ${{ matrix.label }} image
     runs-on: [self-hosted, ssc-dto]
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -96,3 +97,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.version }}${{ matrix.tag_suffix }}
             ${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }}${{ matrix.tag_suffix }}
+          # Reuses the compiled flash-attn layer (and other unchanged layers) across
+          # runs via the GitHub Actions cache, scoped per matrix entry so the CPU,
+          # H100 and L40 builds (different build-args) don't clobber each other's cache.
+          cache-from: type=gha,scope=${{ matrix.label }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.label }}
