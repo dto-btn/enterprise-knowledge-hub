@@ -9,7 +9,12 @@ on:
 env:
   IMAGE_NAME: enterprise-knowledge-hub
   REGISTRY: ghcr.io
-  JOBS_AND_THREADS: 16 # 8 workers would run this job in 30 ish minute (flash-attn lib build)
+  # MAX_JOBS x NVCC_THREADS = effective compile parallelism. Each MAX_JOBS unit
+  # is a separate nvcc process that can use several GB of RAM compiling
+  # flash-attn's CUDA templates, so keep this low relative to the runner's RAM
+  # (not just CPU cores) to avoid OOM-killing the runner/host. See Dockerfile.
+  MAX_JOBS: 4
+  NVCC_THREADS: 1
 
 jobs:
   build:
@@ -93,7 +98,8 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ matrix.base_image }}
             CUDA_ARCH=${{ matrix.cuda_arch }}
-            JOBS_AND_THREADS=${{ env.JOBS_AND_THREADS }}
+            MAX_JOBS=${{ env.MAX_JOBS }}
+            NVCC_THREADS=${{ env.NVCC_THREADS }}
             BUILD_FLASH=${{ matrix.build_flash }}
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.version }}${{ matrix.tag_suffix }}

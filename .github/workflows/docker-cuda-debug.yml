@@ -39,7 +39,12 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  JOBS_AND_THREADS: 8
+  # MAX_JOBS x NVCC_THREADS = effective compile parallelism. Each MAX_JOBS unit
+  # is a separate nvcc process that can use several GB of RAM compiling
+  # flash-attn's CUDA templates, so keep this low relative to the runner's RAM
+  # (not just CPU cores) to avoid OOM-killing the runner/host. See Dockerfile.
+  MAX_JOBS: 4
+  NVCC_THREADS: 1
 
 jobs:
   cuda-debug:
@@ -125,7 +130,8 @@ jobs:
           build-args: |
             BASE_IMAGE=cuda
             CUDA_ARCH=${{ steps.inputs.outputs.cuda_arch }}
-            JOBS_AND_THREADS=${{ env.JOBS_AND_THREADS }}
+            MAX_JOBS=${{ env.MAX_JOBS }}
+            NVCC_THREADS=${{ env.NVCC_THREADS }}
             BUILD_FLASH=${{ steps.inputs.outputs.build_flash == 'true' && 'TRUE' || 'FALSE' }}
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository }}:cuda-debug-${{ steps.inputs.outputs.cuda_arch }}-${{ github.run_id }}-${{ github.run_attempt }}

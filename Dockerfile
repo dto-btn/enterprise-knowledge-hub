@@ -8,7 +8,13 @@ FROM nvidia/cuda:12.9.1-cudnn-devel-ubuntu24.04 AS builder-cuda
 # For local dev:  docker build --build-arg BASE_IMAGE=cuda --build-arg CUDA_ARCH="8.6" -t ekh:local-8.6 .
 # Version that must match the GPU you are running this service on --> https://developer.nvidia.com/cuda/gpus
 ARG CUDA_ARCH
-ARG JOBS_AND_THREADS=8
+# MAX_JOBS spawns MAX_JOBS parallel nvcc processes, each of which then spawns
+# NVCC_THREADS more threads internally (--threads). Effective parallelism is
+# MAX_JOBS x NVCC_THREADS, and each nvcc process compiling flash-attn's CUDA
+# templates can use several GB of RAM, so keep MAX_JOBS low relative to
+# available RAM (not just CPU cores) to avoid OOM-killing the host/runner.
+ARG MAX_JOBS=4
+ARG NVCC_THREADS=1
 ARG BUILD_FLASH=FALSE
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -38,8 +44,8 @@ COPY pyproject.toml uv.lock ./
 # Compile flash-attn from source (no binary wheel exists).
 # All .o / .ptx / .cubin build artefacts and the UV cache stay in THIS stage only
 # and are automatically discarded when the final runtime stage is assembled.
-RUN export MAX_JOBS=${JOBS_AND_THREADS} && \
-    export NVCC_THREADS=${JOBS_AND_THREADS} && \
+RUN export MAX_JOBS=${MAX_JOBS} && \
+    export NVCC_THREADS=${NVCC_THREADS} && \
     export TORCH_CUDA_ARCH_LIST="${CUDA_ARCH}" && \
     export FLASH_ATTENTION_FORCE_BUILD="TRUE" && \
     export FLASH_ATTENTION_FORCE_CXX11_ABI="FALSE" && \
