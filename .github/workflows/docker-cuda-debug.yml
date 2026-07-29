@@ -104,6 +104,14 @@ jobs:
           buildkitd-config-inline: |
             [registry."ghcr.io"]
               ca=["/etc/docker/certs.d/ghcr.io/ca.crt"]
+            # Same GoC root/issuing chain also needs to be trusted for the GitHub
+            # Actions cache backend (results-receiver.actions.githubusercontent.com),
+            # which buildkit calls directly over HTTPS through the same corporate
+            # TLS-intercepting proxy. Reuses the cert file written above - no need
+            # to duplicate it, TOML just requires a separate [registry."..."] key
+            # per hostname.
+            [registry."results-receiver.actions.githubusercontent.com"]
+              ca=["/etc/docker/certs.d/ghcr.io/ca.crt"]
 
       - name: Log in to GitHub Container Registry
         if: steps.inputs.outputs.push_image == 'true'
