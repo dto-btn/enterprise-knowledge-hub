@@ -116,6 +116,11 @@ jobs:
           context: .
           push: ${{ steps.inputs.outputs.push_image == 'true' }}
           load: ${{ steps.inputs.outputs.push_image != 'true' }}
+          # Reuses the compiled flash-attn layer (and other unchanged layers) across
+          # runs via the GitHub Actions cache, scoped per matrix entry so the CPU,
+          # H100 and L40 builds (different build-args) don't clobber each other's cache.
+          cache-from: type=gha,scope=debug-cuda
+          cache-to: type=gha,mode=max,scope=debug-cuda
           platforms: linux/amd64
           build-args: |
             BASE_IMAGE=cuda
