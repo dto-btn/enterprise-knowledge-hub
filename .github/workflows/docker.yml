@@ -33,20 +33,19 @@ jobs:
             build_flash: "FALSE"
             platforms: linux/amd64,linux/arm64
             tag_suffix: ""
-          # Temporarily disabled while CUDA builds are debugged in
-          # .github/workflows/docker-cuda-debug.yml.
-          # - label: CUDA H100/H200
-          #   base_image: cuda
-          #   cuda_arch: "9.0"
-          #   build_flash: "TRUE"
-          #   platforms: linux/amd64
-          #   tag_suffix: "-cuda-9.0"
-          # - label: CUDA L40
-          #   base_image: cuda
-          #   cuda_arch: "8.9"
-          #   build_flash: "FALSE"
-          #   platforms: linux/amd64
-          #   tag_suffix: "-cuda-8.9"
+          # Temporarily disabled flash-attn even in CUDA builds due to failure (lack of power imo...) in runners.
+          - label: CUDA H100/H200
+            base_image: cuda
+            cuda_arch: "9.0"
+            build_flash: "FALSE"
+            platforms: linux/amd64
+            tag_suffix: "-cuda-9.0"
+          - label: CUDA L40
+            base_image: cuda
+            cuda_arch: "8.9"
+            build_flash: "FALSE"
+            platforms: linux/amd64
+            tag_suffix: "-cuda-8.9"
     steps:
       - uses: actions/checkout@v4
 
