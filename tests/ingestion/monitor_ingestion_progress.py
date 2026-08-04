@@ -188,6 +188,42 @@ def _fetch_database_volume_bytes(conn: psycopg.Connection) -> int | None:
     return int(value)
 
 
+def _iter_stage_progress_rows(rows: list[ProgressRow]) -> list[tuple[str, dict[str, Any]]]:
+    """Project run_history rows to stage names and normalized metadata dicts."""
+    projected: list[tuple[str, dict[str, Any]]] = []
+    for row in rows:
+        stage = START_STAGE_BY_STATUS.get(row.status)
+        if stage is None:
+            continue
+        projected.append((stage, row.metadata or {}))
+    return projected
+
+
+def _append_stage_progress_rows(
+    rows: list[ProgressRow],
+    output_path: Path,
+    experiment_name: str | None,
+    run_id: int,
+    service_name: str,
+    database_volume_bytes: int | None,
+) -> None:
+    """Append all stage progress rows for the current poll sample."""
+    for stage, metadata in _iter_stage_progress_rows(rows):
+        _append_csv_row(
+            output_path,
+            experiment_name,
+            run_id,
+            service_name,
+            stage,
+            metadata.get("status"),
+            metadata.get("completed"),
+            metadata.get("total"),
+            metadata.get("throughput"),
+            metadata.get("elapsed_seconds"),
+            database_volume_bytes,
+        )
+
+
 def _monitor_run_progress(
     run_id: int,
     service_name: str,
@@ -203,34 +239,15 @@ def _monitor_run_progress(
         while True:
             rows = _fetch_run_rows(conn, run_id, service_name)
             database_volume_bytes = _fetch_database_volume_bytes(conn)
-
             ended = any(row.status in (RUN_ENDED, RUN_STOPPED) for row in rows)
-
-            for row in rows:
-                stage = START_STAGE_BY_STATUS.get(row.status)
-                if stage is None:
-                    continue
-
-                metadata = row.metadata or {}
-                stage_status = metadata.get("status")
-                completed = metadata.get("completed")
-                total = metadata.get("total")
-                throughput = metadata.get("throughput")
-                elapsed_seconds = metadata.get("elapsed_seconds")
-
-                _append_csv_row(
-                    output_path,
-                    experiment_name,
-                    run_id,
-                    service_name,
-                    stage,
-                    stage_status,
-                    completed,
-                    total,
-                    throughput,
-                    elapsed_seconds,
-                    database_volume_bytes,
-                )
+            _append_stage_progress_rows(
+                rows=rows,
+                output_path=output_path,
+                experiment_name=experiment_name,
+                run_id=run_id,
+                service_name=service_name,
+                database_volume_bytes=database_volume_bytes,
+            )
 
             if ended:
                 print(f"Run {run_id} ended. CSV written to {output_path}")
@@ -257,9 +274,9 @@ def main() -> int:
 
     load_dotenv()
 
-    # Use the provided run_id or generate a (somewhat) random run_id. 
+    # Use the provided run_id or generate a (somewhat) random run_id.
     # This removes the need to handle searching for the correct run_id.
-    run_id = int(time.time()) & 0x7FFFFFFF
+    run_id = args.run_id if args.run_id is not None else int(time.time()) & 0x7FFFFFFF
 
     output_path = Path(args.output_csv) if args.output_csv else _build_default_output_path()
 
