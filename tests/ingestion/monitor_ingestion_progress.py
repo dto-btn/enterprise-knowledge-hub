@@ -122,6 +122,13 @@ def _start_run(api_base_url: str, service: str, run_id: int) -> None:
         _ = response.read()
 
 
+def _stop_run(api_base_url: str, service: str) -> None:
+    """Call the stop endpoint to halt the current run."""
+    url = f"{api_base_url.rstrip('/')}/knowledge/{service}/stop"
+    with urlopen(url, timeout=30) as response:  # nosec B310
+        _ = response.read()
+
+
 def _prepare_csv(path: Path) -> None:
     """Create CSV parent directory and write header if missing."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -231,6 +238,7 @@ def _monitor_run_progress(
     experiment_name: str | None,
     poll_interval: float,
     timeout_seconds: float,
+    api_base_url: str,
 ) -> int:
     """Poll run history and append stage progress rows until end or timeout."""
     started = time.perf_counter()
@@ -254,7 +262,12 @@ def _monitor_run_progress(
                 return 0
 
             if time.perf_counter() - started > timeout_seconds:
-                print(f"Timed out after {timeout_seconds} seconds. Partial CSV at {output_path}")
+                print(f"Timed out after {timeout_seconds} seconds. Sending stop signal...")
+                try:
+                    _stop_run(api_base_url, service_name)
+                except URLError as exc:
+                    print(f"Failed to send stop signal: {exc}")
+                print(f"Partial CSV at {output_path}")
                 return 2
 
             time.sleep(poll_interval)
@@ -296,6 +309,7 @@ def main() -> int:
         experiment_name=args.experiment_name,
         poll_interval=args.poll_interval,
         timeout_seconds=args.timeout_seconds,
+        api_base_url=args.api_base_url,
     )
 
 
