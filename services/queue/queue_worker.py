@@ -22,7 +22,8 @@ class QueueWorker:
         self.poll_interval = poll_interval
         self.message_count = 0
 
-    def run(self, service_name: str, queue_name: str, handler: Callable[..., Any], should_exit: Callable[[bool], bool]):
+    def run(self, service_name: str, queue_name: str, handler: Callable[..., Any],
+            should_exit: Callable[[bool], bool], on_message: Callable[[int], None] | None = None):
         """
         Main function to poll from queues.
 
@@ -33,6 +34,7 @@ class QueueWorker:
         :type queue_name: str
         :param handler: callable function.  processes item
         :param should_exit: callable function. exit condition for loop
+        :param on_message: callable function. called after each message
         """
         while not self.stop_event.is_set():
             drained_any = False # to check if any messages read/drained this iteration
@@ -41,6 +43,8 @@ class QueueWorker:
                 for item, delivery_tag in self.queue_service.read(queue_name):
                     drained_any = True
                     self.message_count += 1
+                    if on_message is not None:
+                        on_message(self.message_count)
                     try:
                         if self.stop_event.is_set():
                             self.logger.info("Stop event is true. Stopping process: %s - %s", service_name, queue_name)
