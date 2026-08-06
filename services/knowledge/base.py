@@ -33,7 +33,7 @@ class KnowledgeService(ABC):
     _executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=3)
     _futures: list[Future] = field(default_factory=list)
     _progress_metrics: ProgressMetricsTracker = field(
-        default_factory=ProgressMetricsTracker,
+        default=None,
         init=False,
     )
 

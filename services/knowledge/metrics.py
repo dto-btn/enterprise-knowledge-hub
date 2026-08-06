@@ -23,7 +23,7 @@ class ProgressMetricsTracker:
     update_every_n_items: int = 500
     update_every_seconds: float = 2.0
     _state: dict[str, StageProgressState] = field(default_factory=dict)
-    _run_history_service: RunHistoryService
+    _run_history_service: RunHistoryService = field(init=False, default=None)  # type: ignore[assignment]
 
     def __init__(self, run_history_service: RunHistoryService) -> None:
         """Initialize tracker, defaulting to environment-derived config."""
@@ -55,39 +55,39 @@ class ProgressMetricsTracker:
     def update_progress(self, row_id: int, stage: str, completed: int,
                                          stage_start: float, total: int | None = None,
                                          stage_status: str = "running", force: bool = False) -> None:
-            """Update progress metadata for a stage start row using throttling."""
-            metadata = self.maybe_progress_metadata(
-                stage=stage,
-                completed=completed,
-                stage_start=stage_start,
-                total=total,
-                stage_status=stage_status,
-                force=force,
-            )
-            if metadata is None:
-                return
-            self._run_history_service.update_history_table_log(
-                row_id=row_id,
-                metadata=metadata,
-            )
+        """Update progress metadata for a stage start row using throttling."""
+        metadata = self.maybe_progress_metadata(
+            stage=stage,
+            completed=completed,
+            stage_start=stage_start,
+            total=total,
+            stage_status=stage_status,
+            force=force,
+        )
+        if metadata is None:
+            return
+        self._run_history_service.update_history_table_log(
+            row_id=row_id,
+            metadata=metadata,
+        )
 
     def insert_start_log(self, run_status: RunStatus, stage: str,
                          run_id: int, service_name: str, stage_start: float, total: int | None = None) -> int:
-            """Insert start status row and return the created run_history row id."""
-            metadata = self.start_stage(
-                stage=stage,
-                stage_start=stage_start,
-                total=total,
-            )
-    
-            row = self._run_history_service.insert_history_table_log(
-                run_id,
-                service_name,
-                run_status,
-                metadata,
-                datetime.now(),
-            )
-            return row.id
+        """Insert start status row and return the created run_history row id."""
+        metadata = self.start_stage(
+            stage=stage,
+            stage_start=stage_start,
+            total=total,
+        )
+
+        row = self._run_history_service.insert_history_table_log(
+            run_id,
+            service_name,
+            run_status,
+            metadata,
+            datetime.now(),
+        )
+        return row.id
 
     def build_progress_metadata(self, stage: str, status: str, completed: int, total: int | None, stage_start: float,
                                 now_perf: float | None = None) -> dict[str, object]:
@@ -108,7 +108,7 @@ class ProgressMetricsTracker:
             "updated_at": datetime.now().isoformat(),
         }
 
-    def maybe_progress_metadata(self, stage: str, completed: int, stage_start: float, total: int | None = None, 
+    def maybe_progress_metadata(self, stage: str, completed: int, stage_start: float, total: int | None = None,
                                 stage_status: str = "running", force: bool = False) -> dict[str, object] | None:
         """Return progress metadata for a stage, if an update is ready"""
         if not self.enabled:
