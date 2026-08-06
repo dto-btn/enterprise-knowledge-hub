@@ -39,7 +39,7 @@ class KnowledgeService(ABC):
 
     def __post_init__(self) -> None:
         self._source_registry_service = KbSourceRegistryService()
-        self._progress_metrics = ProgressMetricsTracker()
+        self._progress_metrics = ProgressMetricsTracker(self.run_history_service)
 
     @abstractmethod
     def get_query_instruction(self) -> str:
@@ -156,25 +156,6 @@ class KnowledgeService(ABC):
         )
         return row.id
 
-    def _update_progress(self, row_id: int, stage: str, completed: int,
-                                     stage_start: float, total: int | None = None,
-                                     stage_status: str = "running", force: bool = False) -> None:
-        """Update progress metadata for a stage start row using throttling."""
-        metadata = self._progress_metrics.maybe_progress_metadata(
-            stage=stage,
-            completed=completed,
-            stage_start=stage_start,
-            total=total,
-            stage_status=stage_status,
-            force=force,
-        )
-        if metadata is None:
-            return
-        self.run_history_service.update_history_table_log(
-            row_id=row_id,
-            metadata=metadata,
-        )
-
     @abstractmethod
     def _get_run_id(self) -> int:
         """Get a unique id for run"""
@@ -232,7 +213,7 @@ class KnowledgeService(ABC):
                     break
                 self.emit_fetched_item(item)
                 count += 1
-                self._update_progress(
+                self._progress_metrics.update_progress(
                     row_id=ingest_started_row_id,
                     stage="ingest",
                     completed=count,
@@ -247,7 +228,7 @@ class KnowledgeService(ABC):
         except Exception:
             self.logger.exception("Error during finalize_ingest for: %s",
                                 self.service_name)
-        self._update_progress(
+        self._progress_metrics.update_progress(
             row_id=ingest_started_row_id,
             stage="ingest",
             completed=count,
@@ -300,7 +281,7 @@ class KnowledgeService(ABC):
                 service_name=self.service_name,
                 handler=self.process_handler,
                 should_exit=self.process_should_exit,
-                on_message=lambda current_count: self._update_progress(
+                on_message=lambda current_count: self._progress_metrics.update_progress(
                     row_id=processing_started_row_id,
                     stage="process",
                     completed=current_count,
@@ -319,7 +300,7 @@ class KnowledgeService(ABC):
         except Exception:
             self.logger.exception("Error during finalize_process for queue: %s. (%s)",
                                 self._ingest_queue_name(), self.service_name)
-        self._update_progress(
+        self._progress_metrics.update_progress(
             row_id=processing_started_row_id,
             stage="process",
             completed=count,
@@ -375,7 +356,7 @@ class KnowledgeService(ABC):
                 service_name=self.service_name,
                 handler=self.store_handler,
                 should_exit=self.store_should_exit,
-                on_message=lambda current_count: self._update_progress(
+                on_message=lambda current_count: self._progress_metrics.update_progress(
                     row_id=storing_started_row_id,
                     stage="store",
                     completed=current_count,
@@ -393,7 +374,7 @@ class KnowledgeService(ABC):
         except Exception:
             self.logger.exception("Error during finalize_store for queue: %s. (%s)",
                                                                     self._processed_queue_name(), self.service_name)
-        self._update_progress(
+        self._progress_metrics.update_progress(
             row_id=storing_started_row_id,
             stage="store",
             completed=count,
