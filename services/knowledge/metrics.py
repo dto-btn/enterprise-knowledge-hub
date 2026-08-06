@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from services.database.run_history_service import RunHistoryService
+from services.knowledge.models import RunStatus
 
 @dataclass
 class StageProgressState:
@@ -69,6 +70,24 @@ class ProgressMetricsTracker:
                 row_id=row_id,
                 metadata=metadata,
             )
+
+    def insert_start_log(self, run_status: RunStatus, stage: str,
+                         run_id: int, service_name: str, stage_start: float, total: int | None = None) -> int:
+            """Insert start status row and return the created run_history row id."""
+            metadata = self.start_stage(
+                stage=stage,
+                stage_start=stage_start,
+                total=total,
+            )
+    
+            row = self._run_history_service.insert_history_table_log(
+                run_id,
+                service_name,
+                run_status,
+                metadata,
+                datetime.now(),
+            )
+            return row.id
 
     def build_progress_metadata(self, stage: str, status: str, completed: int, total: int | None, stage_start: float,
                                 now_perf: float | None = None) -> dict[str, object]:

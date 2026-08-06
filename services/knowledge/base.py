@@ -138,24 +138,6 @@ class KnowledgeService(ABC):
             self.run_history_service.insert_history_table_log(self._run_id, self.service_name,
                                                           RunStatus.RUN_ENDED, None, datetime.now())
 
-    def _insert_start_log(self, run_status: RunStatus, stage: str,
-                                stage_start: float, total: int | None = None) -> int:
-        """Insert start status row and return the created run_history row id."""
-        metadata = self._progress_metrics.start_stage(
-            stage=stage,
-            stage_start=stage_start,
-            total=total,
-        )
-
-        row = self.run_history_service.insert_history_table_log(
-            self._run_id,
-            self.service_name,
-            run_status,
-            metadata,
-            datetime.now(),
-        )
-        return row.id
-
     @abstractmethod
     def _get_run_id(self) -> int:
         """Get a unique id for run"""
@@ -203,8 +185,8 @@ class KnowledgeService(ABC):
         """Ingest data into the knowledge base."""
         self.logger.info("Ingesting data into the knowledge base. (%s)", self.service_name)
         start = time.perf_counter()
-        ingest_started_row_id = self._insert_start_log(
-            RunStatus.INGESTION_STARTED, "ingest", start, total=None
+        ingest_started_row_id = self._progress_metrics.insert_start_log(
+            RunStatus.INGESTION_STARTED, "ingest", self._run_id, self.service_name, start, total=None
         )
         count = 0
         try:
@@ -263,8 +245,8 @@ class KnowledgeService(ABC):
 
         self.logger.info("Processing ingested data from queue: %s. (%s)", self._ingest_queue_name(), self.service_name)
         start = time.perf_counter()
-        processing_started_row_id = self._insert_start_log(
-            RunStatus.PROCESSING_STARTED, "process", start, total=None
+        processing_started_row_id = self._progress_metrics.insert_start_log(
+            RunStatus.PROCESSING_STARTED, "process", self._run_id, self.service_name, start, total=None
         )
         count = 0
 
@@ -338,8 +320,8 @@ class KnowledgeService(ABC):
         self.logger.info("Storing processed data from queue: %s. (%s)", self._processed_queue_name(),
                                                                         self.service_name)
         start = time.perf_counter()
-        storing_started_row_id = self._insert_start_log(
-            RunStatus.STORING_STARTED, "store", start, total=None
+        storing_started_row_id = self._progress_metrics.insert_start_log(
+            RunStatus.STORING_STARTED, "store", self._run_id, self.service_name, start, total=None
         )
         count = 0
 
