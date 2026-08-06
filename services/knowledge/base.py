@@ -14,6 +14,7 @@ from services.database.kb_source_registry_service import KbSourceRegistryService
 from services.database.run_history_service import RunHistoryService
 from services.knowledge.models import KnowledgeItem
 from services.knowledge.models import RunStatus
+from services.knowledge.metrics import ProgressMetricsTracker
 from services.queue.queue_worker import QueueWorker
 from services.queue.queue_service import QueueService
 
@@ -31,18 +32,14 @@ class KnowledgeService(ABC):
     _poll_interval: float = 0.5  # seconds to wait before retrying empty queue
     _executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=3)
     _futures: list[Future] = field(default_factory=list)
-    _progress_metrics_enabled: bool = field(default=False, init=False)
-    _progress_update_every_n_items: int = field(default=500, init=False)
-    _progress_update_every_seconds: float = field(default=2.0, init=False)
-    _progress_state: dict[str, dict[str, float]] = field(default_factory=dict, init=False)
+    _progress_metrics: ProgressMetricsTracker = field(
+        default_factory=ProgressMetricsTracker,
+        init=False,
+    )
 
     def __post_init__(self) -> None:
         self._source_registry_service = KbSourceRegistryService()
-        self._progress_metrics_enabled = os.getenv(
-            "SVC_KB_PROGRESS_METRICS_ENABLED", "false"
-        ).lower() in ("1", "true", "yes")
-        self._progress_update_every_n_items = int(os.getenv("SVC_KB_PROGRESS_UPDATE_EVERY_N_ITEMS", "500"))
-        self._progress_update_every_seconds = float(os.getenv("SVC_KB_PROGRESS_UPDATE_EVERY_SECONDS", "2.0"))
+        self._progress_metrics = ProgressMetricsTracker()
 
     @abstractmethod
     def get_query_instruction(self) -> str:
@@ -141,38 +138,14 @@ class KnowledgeService(ABC):
             self.run_history_service.insert_history_table_log(self._run_id, self.service_name,
                                                           RunStatus.RUN_ENDED, None, datetime.now())
 
-    def _build_progress_metadata(self, stage: str, status: str, completed: int,
-                                 total: int | None, stage_start: float,
-                                 now_perf: float | None = None) -> dict[str, object]:
-        """Build progress metadata payload for a running stage."""
-        if now_perf is None:
-            now_perf = time.perf_counter()
-        elapsed_seconds = max(0.0, now_perf - stage_start)
-        throughput = completed / elapsed_seconds if elapsed_seconds > 0 else 0.0
-
-        return {
-            "stage": stage,
-            "status": status,
-            "completed": completed,
-            "total": total,
-            "throughput": throughput,
-            "elapsed_seconds": elapsed_seconds,
-            "updated_at": datetime.now().isoformat(),
-        }
-
     def _insert_start_log(self, run_status: RunStatus, stage: str,
                                 stage_start: float, total: int | None = None) -> int:
         """Insert start status row and return the created run_history row id."""
-        metadata = None
-        if self._progress_metrics_enabled:
-            metadata = self._build_progress_metadata(
-                stage=stage,
-                status="running",
-                completed=0,
-                total=total,
-                stage_start=stage_start,
-                now_perf=stage_start,
-            )
+        metadata = self._progress_metrics.start_stage(
+            stage=stage,
+            stage_start=stage_start,
+            total=total,
+        )
 
         row = self.run_history_service.insert_history_table_log(
             self._run_id,
@@ -181,44 +154,26 @@ class KnowledgeService(ABC):
             metadata,
             datetime.now(),
         )
-        self._progress_state[stage] = {"last_count": 0.0, "last_update": stage_start}
         return row.id
 
     def _update_progress(self, row_id: int, stage: str, completed: int,
                                      stage_start: float, total: int | None = None,
                                      stage_status: str = "running", force: bool = False) -> None:
         """Update progress metadata for a stage start row using throttling."""
-        if not self._progress_metrics_enabled:
-            return
-
-        now_perf = time.perf_counter()
-        state = self._progress_state.setdefault(
-            stage, {"last_count": 0.0, "last_update": stage_start}
-        )
-        count_delta = completed - int(state["last_count"])
-        time_delta = now_perf - state["last_update"]
-
-        should_update = force or (
-            count_delta >= self._progress_update_every_n_items
-            or time_delta >= self._progress_update_every_seconds
-        )
-        if not should_update:
-            return
-
-        metadata = self._build_progress_metadata(
+        metadata = self._progress_metrics.maybe_progress_metadata(
             stage=stage,
-            status=stage_status,
             completed=completed,
-            total=total,
             stage_start=stage_start,
-            now_perf=now_perf,
+            total=total,
+            stage_status=stage_status,
+            force=force,
         )
+        if metadata is None:
+            return
         self.run_history_service.update_history_table_log(
             row_id=row_id,
             metadata=metadata,
         )
-        state["last_count"] = float(completed)
-        state["last_update"] = now_perf
 
     @abstractmethod
     def _get_run_id(self) -> int:
