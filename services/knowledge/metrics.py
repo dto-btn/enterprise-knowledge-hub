@@ -40,7 +40,7 @@ class ProgressMetricsTracker:
         self.enabled = os.getenv("SVC_KB_PROGRESS_METRICS_ENABLED", "false").lower() in ("1", "true", "yes")
         self.update_every_n_items = int(os.getenv("SVC_KB_PROGRESS_UPDATE_EVERY_N_ITEMS", "500"))
         self.update_every_seconds = float(os.getenv("SVC_KB_PROGRESS_UPDATE_EVERY_SECONDS", "2.0"))
-        self.update_mode = os.getenv("SVC_KB_PROGRESS_METRICS_UPDATE_MODE", "false").lower() in ("1", "true", "yes")
+        self.update_mode = os.getenv("SVC_KB_PROGRESS_METRICS_UPDATE_MODE", "true").lower() in ("1", "true", "yes")
 
     def start_stage(self, stage: str, stage_start: float, total: int | None = None) -> dict[str, object] | None:
         """Initialize stage tracking and optionally return initial metadata"""
