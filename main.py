@@ -56,12 +56,11 @@ crons = Crons(app, state_backend=SQLAlchemyStateBackend(cron_engine))
 
 @app.middleware("http")
 async def release_db_connection(request, call_next):
-    # Return the thread's Peewee connection to the pool after each request
+    """Return the thread's Peewee connection to the pool after each request."""
     try:
         return await call_next(request)
     finally:
         close_database()
-        
 app.include_router(get_cron_router(), prefix="/crons", tags=["internal"])
 app.include_router(api_router, prefix="/api", tags=["API"])
 app.include_router(frontend_router, prefix="/frontend", tags=["Frontend"])
