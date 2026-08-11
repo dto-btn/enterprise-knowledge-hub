@@ -11,7 +11,7 @@ from repository.run_history_model import RunHistory
 RUN_METRICS_TABLE_NAME = "run_metrics"
 
 
-class RunMetric(Model):  # pylint: disable=too-many-instance-attributes
+class RunMetrics(Model):  # pylint: disable=too-many-instance-attributes
     """run_metrics table model"""
     id: int = AutoField()
     run_history = ForeignKeyField(RunHistory, backref="metrics", column_name="run_history_id")
