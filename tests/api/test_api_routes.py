@@ -22,8 +22,8 @@ class TestApiRoutes(unittest.TestCase):
 
     def test_list_run_history(self) -> None:
         """Should return run history rows as JSON."""
-        run_history_module._run_history_service = MagicMock()
-        run_history_module._run_history_service.run_history_table_rows.return_value = [
+        run_history_module.run_history_service = MagicMock()
+        run_history_module.run_history_service.run_history_table_rows.return_value = [
             SimpleNamespace(
                 id=1,
                 run_id=101,
@@ -42,8 +42,8 @@ class TestApiRoutes(unittest.TestCase):
 
     def test_list_run_metrics(self) -> None:
         """Should return run metrics rows as JSON."""
-        run_metrics_module._run_metrics_service = MagicMock()
-        run_metrics_module._run_metrics_service.run_metrics_table_rows.return_value = [
+        run_metrics_module.run_metrics_service = MagicMock()
+        run_metrics_module.run_metrics_service.run_metrics_table_rows.return_value = [
             SimpleNamespace(
                 id=1,
                 run_history_id=1,

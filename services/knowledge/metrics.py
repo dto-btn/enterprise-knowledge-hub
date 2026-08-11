@@ -56,7 +56,7 @@ class ProgressMetricsTracker:
     def update_progress(self, row_id: int, stage: str, completed: int,
                                          stage_start: float, total: int | None = None,
                                          stage_status: str = "running", force: bool = False) -> None:
-        """Insert progress metadata for a stage using throttling."""
+        """Insert or update progress metadata for a stage using throttling."""
         metadata = self.maybe_progress_metadata(
             stage=stage,
             completed=completed,
