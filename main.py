@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from repository.database import close_database, initialize_database
 from repository.migration.initial_baseline import run_init_migration
 from repository.database import db
+from router.api import router as api_router
 from router.frontend.frontend import router as frontend_router
 from router.root.run_management_endpoints import KNOWLEDGE_BASE
 from router.root.run_management_endpoints import router as endpoints
@@ -54,6 +55,7 @@ app = FastAPI(lifespan=lifespan)
 crons = Crons(app, state_backend=SQLAlchemyStateBackend(cron_engine))
 
 app.include_router(get_cron_router(), prefix="/crons", tags=["internal"])
+app.include_router(api_router, prefix="/api", tags=["API"])
 app.include_router(frontend_router, prefix="/frontend", tags=["Frontend"])
 app.include_router(endpoints, prefix=KNOWLEDGE_BASE, tags=["Knowledge (Indexing Operations)"])
 app.include_router(db_endpoints, prefix="/database", tags=["Database Interaction"])

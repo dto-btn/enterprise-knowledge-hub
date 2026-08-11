@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from services.database.run_history_service import RunHistoryService
+from services.database.run_metrics_service import RunMetricsService
 from services.knowledge.models import RunStatus
 
 @dataclass
@@ -17,25 +18,29 @@ class StageProgressState:
 
 @dataclass
 class ProgressMetricsTracker:
-    """Build and throttle progress metadata updates for run history logs"""
+    """Build and throttle progress metadata updates for run metrics rows"""
 
     enabled: bool = False
     update_every_n_items: int = 500
     update_every_seconds: float = 2.0
+    update_mode: bool = False
     _state: dict[str, StageProgressState] = field(default_factory=dict)
     _run_history_service: RunHistoryService = field(init=False, default=None)  # type: ignore[assignment]
+    _run_metrics_service: RunMetricsService = field(init=False, default=None)  # type: ignore[assignment]
 
     def __init__(self, run_history_service: RunHistoryService) -> None:
         """Initialize tracker, defaulting to environment-derived config."""
         self.from_env()
         self._state = {}
         self._run_history_service = run_history_service
+        self._run_metrics_service = RunMetricsService()
 
     def from_env(self) -> None:
         """Read tracker config from environment variables."""
         self.enabled = os.getenv("SVC_KB_PROGRESS_METRICS_ENABLED", "false").lower() in ("1", "true", "yes")
         self.update_every_n_items = int(os.getenv("SVC_KB_PROGRESS_UPDATE_EVERY_N_ITEMS", "500"))
         self.update_every_seconds = float(os.getenv("SVC_KB_PROGRESS_UPDATE_EVERY_SECONDS", "2.0"))
+        self.update_mode = os.getenv("SVC_KB_PROGRESS_METRICS_UPDATE_MODE", "false").lower() in ("1", "true", "yes")
 
     def start_stage(self, stage: str, stage_start: float, total: int | None = None) -> dict[str, object] | None:
         """Initialize stage tracking and optionally return initial metadata"""
@@ -55,7 +60,7 @@ class ProgressMetricsTracker:
     def update_progress(self, row_id: int, stage: str, completed: int,
                                          stage_start: float, total: int | None = None,
                                          stage_status: str = "running", force: bool = False) -> None:
-        """Update progress metadata for a stage start row using throttling."""
+        """Insert progress metadata for a stage using throttling."""
         metadata = self.maybe_progress_metadata(
             stage=stage,
             completed=completed,
@@ -66,10 +71,18 @@ class ProgressMetricsTracker:
         )
         if metadata is None:
             return
-        self._run_history_service.update_history_table_log(
-            row_id=row_id,
-            metadata=metadata,
-        )
+        if self.update_mode:
+            self._run_metrics_service.update_metric(
+                run_history_id=row_id,
+                metadata=metadata,
+                timestamp=datetime.now(),
+            )
+        else:
+            self._run_metrics_service.insert_metric(
+                run_history_id=row_id,
+                metadata=metadata,
+                timestamp=datetime.now(),
+            )
 
     def insert_start_log(self, run_status: RunStatus, stage: str,
                          run_id: int, service_name: str, stage_start: float, total: int | None = None) -> int:
@@ -87,6 +100,12 @@ class ProgressMetricsTracker:
             metadata,
             datetime.now(),
         )
+        if metadata is not None:
+            self._run_metrics_service.insert_metric(
+                run_history_id=row.id,
+                metadata=metadata,
+                timestamp=datetime.now(),
+            )
         return row.id
 
     def build_progress_metadata(self, stage: str, status: str, completed: int, total: int | None, stage_start: float,

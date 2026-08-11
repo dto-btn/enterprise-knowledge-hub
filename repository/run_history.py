@@ -33,10 +33,3 @@ class RunHistoryRepository(BaseRepository):
                 .get_or_none())
 
         return query
-
-    def update_metadata(self, row_id: int, metadata: dict | None) -> bool:
-        """Update metadata for a specific run_history row."""
-        query = (self.model
-                 .update(metadata=metadata)
-                 .where(self.model.id == row_id))
-        return query.execute() > 0
