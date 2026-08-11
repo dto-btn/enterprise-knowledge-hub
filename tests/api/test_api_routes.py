@@ -39,3 +39,30 @@ class TestApiRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()[0]["id"], 1)
         self.assertEqual(response.json()[0]["service_name"], "wikipedia")
+
+    def test_list_run_metrics(self) -> None:
+        """Should return run metrics rows as JSON."""
+        run_metrics_module._run_metrics_service = MagicMock()
+        run_metrics_module._run_metrics_service.run_metrics_table_rows.return_value = [
+            SimpleNamespace(
+                id=1,
+                run_history_id=1,
+                metadata={"progress": 50},
+                timestamp=datetime(2026, 8, 10, 12, 5, tzinfo=timezone.utc),
+            ),
+            SimpleNamespace(
+                id=2,
+                run_history_id=1,
+                metadata={"progress": 100},
+                timestamp=datetime(2026, 8, 10, 12, 10, tzinfo=timezone.utc),
+            )
+        ]
+
+        response = self.client.get("/api/run-metrics")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 2)
+        self.assertEqual(response.json()[0]["id"], 1)
+        self.assertEqual(response.json()[0]["metadata"]["progress"], 50)
+        self.assertEqual(response.json()[1]["id"], 2)
+        self.assertEqual(response.json()[1]["metadata"]["progress"], 100)
