@@ -82,7 +82,7 @@ def knowledge_registry():
 @router.get("/{slug}/state")
 def knowledge_state(slug: str):
     """Return the current run state for the given knowledge source."""
-    service, state = _get_or_404(slug)
+    _, state = _get_or_404(slug)
     return {
         "is_running": state.is_running()
     }
