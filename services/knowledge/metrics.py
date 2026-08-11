@@ -4,9 +4,7 @@ import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from services.database.run_history_service import RunHistoryService
 from services.database.run_metrics_service import RunMetricsService
-from services.knowledge.models import RunStatus
 
 @dataclass
 class StageProgressState:
@@ -25,14 +23,12 @@ class ProgressMetricsTracker:
     update_every_seconds: float = 2.0
     update_mode: bool = False
     _state: dict[str, StageProgressState] = field(default_factory=dict)
-    _run_history_service: RunHistoryService = field(init=False, default=None)  # type: ignore[assignment]
     _run_metrics_service: RunMetricsService = field(init=False, default=None)  # type: ignore[assignment]
 
-    def __init__(self, run_history_service: RunHistoryService) -> None:
+    def __init__(self) -> None:
         """Initialize tracker, defaulting to environment-derived config."""
         self.from_env()
         self._state = {}
-        self._run_history_service = run_history_service
         self._run_metrics_service = RunMetricsService()
 
     def from_env(self) -> None:
@@ -84,28 +80,20 @@ class ProgressMetricsTracker:
                 timestamp=datetime.now(),
             )
 
-    def insert_start_log(self, run_status: RunStatus, stage: str,
-                         run_id: int, service_name: str, stage_start: float, total: int | None = None) -> int:
-        """Insert start status row and return the created run_history row id."""
+    def insert_start_metric(self, row_id: int, stage: str,
+                            stage_start: float, total: int | None = None) -> None:
+        """Initialize stage tracking and insert initial run_metrics metadata if enabled."""
         metadata = self.start_stage(
             stage=stage,
             stage_start=stage_start,
             total=total,
         )
-
-        row = self._run_history_service.insert_history_table_log(
-            run_id,
-            service_name,
-            run_status,
-            None,
-            datetime.now(),
-        )
-        self._run_metrics_service.insert_metric(
-            run_history_id=row.id,
-            metadata=metadata,
-            timestamp=datetime.now(),
-        )
-        return row.id
+        if self.enabled:
+            self._run_metrics_service.insert_metric(
+                run_history_id=row_id,
+                metadata=metadata,
+                timestamp=datetime.now(),
+            )
 
     def build_progress_metadata(self, stage: str, status: str, completed: int, total: int | None, stage_start: float,
                                 now_perf: float | None = None) -> dict[str, object]:
@@ -129,7 +117,7 @@ class ProgressMetricsTracker:
     def maybe_progress_metadata(self, stage: str, completed: int, stage_start: float, total: int | None = None,
                                 stage_status: str = "running", force: bool = False) -> dict[str, object] | None:
         """Return progress metadata for a stage, if an update is ready"""
-        if not self.enabled and not force:
+        if not self.enabled:
             return None
 
         now_perf = time.perf_counter()
