@@ -97,15 +97,14 @@ class ProgressMetricsTracker:
             run_id,
             service_name,
             run_status,
-            metadata,
+            None,
             datetime.now(),
         )
-        if metadata is not None:
-            self._run_metrics_service.insert_metric(
-                run_history_id=row.id,
-                metadata=metadata,
-                timestamp=datetime.now(),
-            )
+        self._run_metrics_service.insert_metric(
+            run_history_id=row.id,
+            metadata=metadata,
+            timestamp=datetime.now(),
+        )
         return row.id
 
     def build_progress_metadata(self, stage: str, status: str, completed: int, total: int | None, stage_start: float,
@@ -130,7 +129,7 @@ class ProgressMetricsTracker:
     def maybe_progress_metadata(self, stage: str, completed: int, stage_start: float, total: int | None = None,
                                 stage_status: str = "running", force: bool = False) -> dict[str, object] | None:
         """Return progress metadata for a stage, if an update is ready"""
-        if not self.enabled:
+        if not self.enabled and not force:
             return None
 
         now_perf = time.perf_counter()
