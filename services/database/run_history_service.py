@@ -54,3 +54,7 @@ class RunHistoryService():
     def select_first_instance_of_run_id(self, run_id: int) -> RunHistory | None:
         """Get the first record with run_id"""
         return self._repository.select_first_instance_of_run_id(run_id)
+
+    def update_history_table_log(self, row_id: int, metadata: dict | None) -> bool:
+        """Update metadata for an existing run_history row."""
+        return self._repository.update_metadata(row_id=row_id, metadata=metadata)
