@@ -8,11 +8,13 @@ from typing import Any
 import logging
 import threading
 from datetime import datetime
+import time
 
 from services.database.kb_source_registry_service import KbSourceRegistryService
 from services.database.run_history_service import RunHistoryService
 from services.knowledge.models import KnowledgeItem
 from services.knowledge.models import RunStatus
+from services.knowledge.metrics import ProgressMetricsTracker
 from services.queue.queue_worker import QueueWorker
 from services.queue.queue_service import QueueService
 
@@ -30,9 +32,14 @@ class KnowledgeService(ABC):
     _poll_interval: float = 0.5  # seconds to wait before retrying empty queue
     _executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=3)
     _futures: list[Future] = field(default_factory=list)
+    _progress_metrics: ProgressMetricsTracker = field(
+        default=None,
+        init=False,
+    )
 
     def __post_init__(self) -> None:
         self._source_registry_service = KbSourceRegistryService()
+        self._progress_metrics = ProgressMetricsTracker(self.run_history_service)
 
     @abstractmethod
     def get_query_instruction(self) -> str:
@@ -177,9 +184,10 @@ class KnowledgeService(ABC):
     def ingest(self) -> None:
         """Ingest data into the knowledge base."""
         self.logger.info("Ingesting data into the knowledge base. (%s)", self.service_name)
-
-        self.run_history_service.insert_history_table_log(self._run_id, self.service_name,
-                                                          RunStatus.INGESTION_STARTED, None, datetime.now())
+        start = time.perf_counter()
+        ingest_started_row_id = self._progress_metrics.insert_start_log(
+            RunStatus.INGESTION_STARTED, "ingest", self._run_id, self.service_name, start, total=None
+        )
         count = 0
         try:
             for item in self.fetch_from_source():
@@ -187,6 +195,12 @@ class KnowledgeService(ABC):
                     break
                 self.emit_fetched_item(item)
                 count += 1
+                self._progress_metrics.update_progress(
+                    row_id=ingest_started_row_id,
+                    stage="ingest",
+                    completed=count,
+                    stage_start=start,
+                )
         except Exception:
             self.logger.exception("Error during ingestion for %s", self.service_name)
 
@@ -196,6 +210,15 @@ class KnowledgeService(ABC):
         except Exception:
             self.logger.exception("Error during finalize_ingest for: %s",
                                 self.service_name)
+        self._progress_metrics.update_progress(
+            row_id=ingest_started_row_id,
+            stage="ingest",
+            completed=count,
+            total=count,
+            stage_start=start,
+            stage_status="completed",
+            force=True,
+        )
         self.run_history_service.insert_history_table_log(self._run_id, self.service_name,
                                                               RunStatus.INGESTION_COMPLETED,
                                                               {"count": count,
@@ -221,8 +244,11 @@ class KnowledgeService(ABC):
         """Process ingested data. Keeps polling until producer is done and queue is empty."""
 
         self.logger.info("Processing ingested data from queue: %s. (%s)", self._ingest_queue_name(), self.service_name)
-        self.run_history_service.insert_history_table_log(self._run_id, self.service_name,
-                                                              RunStatus.PROCESSING_STARTED, None, datetime.now())
+        start = time.perf_counter()
+        processing_started_row_id = self._progress_metrics.insert_start_log(
+            RunStatus.PROCESSING_STARTED, "process", self._run_id, self.service_name, start, total=None
+        )
+        count = 0
 
         try:
             worker = QueueWorker(
@@ -236,7 +262,13 @@ class KnowledgeService(ABC):
                 queue_name=self._ingest_queue_name(),
                 service_name=self.service_name,
                 handler=self.process_handler,
-                should_exit=self.process_should_exit
+                should_exit=self.process_should_exit,
+                on_message=lambda current_count: self._progress_metrics.update_progress(
+                    row_id=processing_started_row_id,
+                    stage="process",
+                    completed=current_count,
+                    stage_start=start,
+                ),
             )
 
             count = worker.message_count
@@ -250,7 +282,15 @@ class KnowledgeService(ABC):
         except Exception:
             self.logger.exception("Error during finalize_process for queue: %s. (%s)",
                                 self._ingest_queue_name(), self.service_name)
-
+        self._progress_metrics.update_progress(
+            row_id=processing_started_row_id,
+            stage="process",
+            completed=count,
+            total=count,
+            stage_start=start,
+            stage_status="completed",
+            force=True,
+        )
 
         self.run_history_service.insert_history_table_log(self._run_id, self.service_name,
                                                               RunStatus.PROCESSING_COMPLETED,
@@ -279,8 +319,11 @@ class KnowledgeService(ABC):
         """
         self.logger.info("Storing processed data from queue: %s. (%s)", self._processed_queue_name(),
                                                                         self.service_name)
-        self.run_history_service.insert_history_table_log(self._run_id, self.service_name,
-                                                          RunStatus.STORING_STARTED, None, datetime.now())
+        start = time.perf_counter()
+        storing_started_row_id = self._progress_metrics.insert_start_log(
+            RunStatus.STORING_STARTED, "store", self._run_id, self.service_name, start, total=None
+        )
+        count = 0
 
         try:
             worker = QueueWorker(
@@ -294,7 +337,13 @@ class KnowledgeService(ABC):
                 queue_name=self._processed_queue_name(),
                 service_name=self.service_name,
                 handler=self.store_handler,
-                should_exit=self.store_should_exit
+                should_exit=self.store_should_exit,
+                on_message=lambda current_count: self._progress_metrics.update_progress(
+                    row_id=storing_started_row_id,
+                    stage="store",
+                    completed=current_count,
+                    stage_start=start,
+                ),
             )
 
             count = worker.message_count
@@ -307,6 +356,15 @@ class KnowledgeService(ABC):
         except Exception:
             self.logger.exception("Error during finalize_store for queue: %s. (%s)",
                                                                     self._processed_queue_name(), self.service_name)
+        self._progress_metrics.update_progress(
+            row_id=storing_started_row_id,
+            stage="store",
+            completed=count,
+            total=count,
+            stage_start=start,
+            stage_status="completed",
+            force=True,
+        )
 
         self.run_history_service.insert_history_table_log(self._run_id, self.service_name,
                                                               RunStatus.STORING_COMPLETED,
