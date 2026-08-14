@@ -189,8 +189,7 @@ class KnowledgeService(ABC):
             None,
             datetime.now(),
         )
-        ingest_started_row_id = ingest_started_row.id
-        self._progress_metrics.insert_start_metric(ingest_started_row_id, "ingest", start, total=None)
+        self._progress_metrics.insert_start_metric(ingest_started_row.id, "ingest", start, total=None)
         count = 0
         try:
             for item in self.fetch_from_source():
@@ -199,7 +198,7 @@ class KnowledgeService(ABC):
                 self.emit_fetched_item(item)
                 count += 1
                 self._progress_metrics.update_progress(
-                    row_id=ingest_started_row_id,
+                    row_id=ingest_started_row.id,
                     stage="ingest",
                     completed=count,
                     stage_start=start,
@@ -214,7 +213,7 @@ class KnowledgeService(ABC):
             self.logger.exception("Error during finalize_ingest for: %s",
                                 self.service_name)
         self._progress_metrics.update_progress(
-            row_id=ingest_started_row_id,
+            row_id=ingest_started_row.id,
             stage="ingest",
             completed=count,
             total=count,
@@ -255,8 +254,7 @@ class KnowledgeService(ABC):
             None,
             datetime.now(),
         )
-        processing_started_row_id = processing_started_row.id
-        self._progress_metrics.insert_start_metric(processing_started_row_id, "process", start, total=None)
+        self._progress_metrics.insert_start_metric(processing_started_row.id, "process", start, total=None)
         count = 0
 
         try:
@@ -273,7 +271,7 @@ class KnowledgeService(ABC):
                 handler=self.process_handler,
                 should_exit=self.process_should_exit,
                 on_message=lambda current_count: self._progress_metrics.update_progress(
-                    row_id=processing_started_row_id,
+                    row_id=processing_started_row.id,
                     stage="process",
                     completed=current_count,
                     stage_start=start,
@@ -292,7 +290,7 @@ class KnowledgeService(ABC):
             self.logger.exception("Error during finalize_process for queue: %s. (%s)",
                                 self._ingest_queue_name(), self.service_name)
         self._progress_metrics.update_progress(
-            row_id=processing_started_row_id,
+            row_id=processing_started_row.id,
             stage="process",
             completed=count,
             total=count,
@@ -336,8 +334,7 @@ class KnowledgeService(ABC):
             None,
             datetime.now(),
         )
-        storing_started_row_id = storing_started_row.id
-        self._progress_metrics.insert_start_metric(storing_started_row_id, "store", start, total=None)
+        self._progress_metrics.insert_start_metric(storing_started_row.id, "store", start, total=None)
         count = 0
 
         try:
@@ -354,7 +351,7 @@ class KnowledgeService(ABC):
                 handler=self.store_handler,
                 should_exit=self.store_should_exit,
                 on_message=lambda current_count: self._progress_metrics.update_progress(
-                    row_id=storing_started_row_id,
+                    row_id=storing_started_row.id,
                     stage="store",
                     completed=current_count,
                     stage_start=start,
@@ -372,7 +369,7 @@ class KnowledgeService(ABC):
             self.logger.exception("Error during finalize_store for queue: %s. (%s)",
                                                                     self._processed_queue_name(), self.service_name)
         self._progress_metrics.update_progress(
-            row_id=storing_started_row_id,
+            row_id=storing_started_row.id,
             stage="store",
             completed=count,
             total=count,
