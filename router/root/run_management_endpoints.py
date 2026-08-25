@@ -74,6 +74,18 @@ def _make_run_task(service: KnowledgeService, state: RunState) -> Callable:
             state.stop()
     return _task
 
+@router.get("/registry")
+def knowledge_registry():
+    """Return the list of available knowledge sources' names.""" 
+    return list(_REGISTRY.keys())
+
+@router.get("/{slug}/state")
+def knowledge_state(slug: str):
+    """Return the current run state for the given knowledge source."""
+    _, state = _get_or_404(slug)
+    return {
+        "is_running": state.is_running()
+    }
 
 # ── Generic run / stop endpoints ──────────────────────────────────────────────
 
