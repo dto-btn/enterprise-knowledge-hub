@@ -1,0 +1,1 @@
+"""Local SharePoint ingestion implementations."""

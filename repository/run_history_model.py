@@ -2,6 +2,7 @@
 from datetime import datetime
 
 from peewee import AutoField, IntegerField, TextField, Model
+from playhouse.postgres_ext import JSONField
 from repository.base_model import TimestampTZField
 from repository.database import db
 
@@ -13,7 +14,7 @@ class RunHistory(Model): #pylint: disable=too-many-instance-attributes
     run_id: int | None = IntegerField(null=True)
     service_name: str = TextField()
     status: str = TextField()
-    metadata: str = TextField(null=True)
+    metadata: dict | None = JSONField(null=True)
     timestamp: datetime = TimestampTZField()
 
     class Meta: # pylint: disable=too-few-public-methods

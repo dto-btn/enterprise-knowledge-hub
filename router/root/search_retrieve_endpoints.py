@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query
 from provider.embedding.qwen3.embedder_factory import get_embedder
 from router.root.models import SearchResponse, SearchResult
 from services.database.kb_source_registry_service import KbSourceRegistryService
+from services.database.change_group_service import ChangeGroupService
 from services.database.tbs_policy_item_service import TBSPolicyItemService
 from services.database.wiki_item_service import WikipediaArticleService
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 _source_registry_service = KbSourceRegistryService()
 _wikipedia_service = WikipediaArticleService(logger)
 _tbs_policy_service = TBSPolicyItemService(logger)
+_change_group_service = ChangeGroupService(logger)
 
 # ── Search service registry ───────────────────────────────────────────────────
 # Add a new searchable source here — one entry, nothing else to change.
@@ -31,6 +33,7 @@ _tbs_policy_service = TBSPolicyItemService(logger)
 _SEARCH_REGISTRY: dict[str, Any] = {
     "wikipedia":    _wikipedia_service,
     "tbs-policies": _tbs_policy_service,
+    "change-group": _change_group_service,
 }
 
 
@@ -47,7 +50,7 @@ def knowledge_search(
 
     The query is embedded using the same model and task instruction that was
     active when the source was last ingested (stored in kb_source_registry).
-    Known sources: wikipedia, tbs-policies.
+    Known sources: wikipedia, tbs-policies, change-group.
     """
     service = _SEARCH_REGISTRY.get(slug)
     if service is None:
