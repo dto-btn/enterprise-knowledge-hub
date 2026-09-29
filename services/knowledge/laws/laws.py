@@ -266,3 +266,4 @@ class LawsKnowledgeService(KnowledgeService):
         validated = LawItemProcessed.model_validate(item)
         record_to_insert = KnowledgeBaseLaws.from_item(validated)
         self._law_item_service.insert(record_to_insert.as_mapping())
+        

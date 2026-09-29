@@ -13,7 +13,7 @@ from services.knowledge.laws.models import LawItemProcessed
 
 load_dotenv()
 
-KB_TABLE_NAME = "laws"
+KB_TABLE_NAME = "kb_laws"
 
 
 class KnowledgeBaseLaws(BaseEmbeddingModel):
@@ -33,13 +33,13 @@ class KnowledgeBaseLaws(BaseEmbeddingModel):
         db_table = KB_TABLE_NAME
         constraints = [
             SQL(
-                'CONSTRAINT laws_page_id_source_chunk_index_key '
+                'CONSTRAINT kb_laws_page_id_source_chunk_index_key '
                 'UNIQUE (page_id, source, chunk_index)'
             )
         ]
         indexes = [
-            SQL('CREATE INDEX IF NOT EXISTS laws_embedding_index '
-                'ON laws USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);'),
+            SQL('CREATE INDEX IF NOT EXISTS kb_laws_embedding_index '
+                'ON kb_laws USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);'),
         ]
 
     @classmethod
