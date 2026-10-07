@@ -7,6 +7,9 @@ from dataclasses import dataclass
 
 from repository.knowledge_wikipedia_model import KnowledgeBaseWikipedia
 from repository.knowledge_wikipedia import KnowledgeWikipediaRepository
+from services.knowledge.wikipedia.models import Source
+
+_SOURCE_LANGUAGE = {Source.WIKIPEDIA_EN.value: "en", Source.WIKIPEDIA_FR.value: "fr"}
 
 
 @dataclass
@@ -34,9 +37,17 @@ class WikipediaArticleService():
         combined_content = "\n\n".join(chunk.content for chunk in chunks)
         return (article.name, combined_content)
 
-    def search_by_embedding(self, embedding: list[float], limit: int = 100) -> list[dict]:
-        """Semantic search over kb_wikipedia by embedding similarity."""
-        return self._repository.search_by_embedding(embedding, limit=limit)
+    def search_by_embedding(self, embedding: list[float], limit: int = 100,
+                            source: str | None = None) -> list[dict]:
+        """Semantic search over kb_wikipedia, adding language and canonical URL to each row."""
+        rows = self._repository.search_by_embedding(embedding, limit=limit, source=source)
+        for row in rows:
+            language = _SOURCE_LANGUAGE.get(row.get("source"))
+            row["language"] = language
+            # curid URLs stay valid across page renames and need no title encoding.
+            row["url"] = (f"https://{language}.wikipedia.org/?curid={row['id']}"
+                          if language and row.get("id") is not None else None)
+        return rows
 
     def delete_by_pid_source(self, pid: int, source: str) -> None:
         """Delete all records by PID and source"""

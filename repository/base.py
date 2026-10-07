@@ -56,6 +56,7 @@ class EmbeddingRepository(BaseRepository):
         embedding: list[float],
         limit: int = 100,
         probes: int = 100,
+        source: str | None = None,
     ) -> list[dict]:
         """Search for similar embeddings using pgvector's <=> cosine distance operator.
 
@@ -63,6 +64,8 @@ class EmbeddingRepository(BaseRepository):
             embedding: The query embedding vector.
             limit: Maximum number of results to return (acts as a safety cap).
             probes: Number of IVFFlat lists to search. Higher = better recall but slower.
+            source: Optional source filter (e.g. "enwiki"). IVFFlat filters after the
+                index scan, so a filtered search may return fewer than `limit` rows.
         """
         embedding_vector = embedding[0] if isinstance(embedding[0], (list, tuple, np.ndarray)) else embedding
         db = self.model._meta.database  # pylint: disable=protected-access
@@ -74,14 +77,19 @@ class EmbeddingRepository(BaseRepository):
 
         with db.atomic():
             db.execute_sql(f"SET LOCAL ivfflat.probes = {int(probes)}")
-            query = (self.model.select(
+            query = self.model.select(
+                        self._id_column().alias('id'),
+                        self.model.source,
                         self.model.name,
                         self.model.content,
                         self.model.chunk_index,
                         (1 - cosine_distance(self.model.embedding, embedding_vector)).alias('similarity')
                     )
-                    .order_by(cosine_distance(self.model.embedding, embedding_vector))
-                    .limit(limit))
+            if source is not None:
+                query = query.where(self.model.source == source)
+            query = (query
+                     .order_by(cosine_distance(self.model.embedding, embedding_vector))
+                     .limit(limit))
             results = list(query.dicts())
 
         return results
