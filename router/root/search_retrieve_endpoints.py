@@ -41,6 +41,7 @@ def knowledge_search(
     slug: str,
     query: str = Query(..., description="Natural language search query"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
+    source: str | None = Query(None, description="Optional source filter, e.g. enwiki or frwiki"),
 ):
     """
     Semantic search over any ingested knowledge source.
@@ -62,13 +63,14 @@ def knowledge_search(
             detail=f"Source '{slug}' has no registry entry — run ingestion first.",
         )
 
-    logger.info("Search: source=%r query=%r limit=%d model=%s",
-                slug, query, limit, source_meta.model_name)
+    # Query text is user content from callers like CanChat; log only its length.
+    logger.info("Search: slug=%r source=%r query_len=%d limit=%d model=%s",
+                slug, source, len(query), limit, source_meta.model_name)
 
     embedder = get_embedder()
     embedding = embedder.embed(query, instruction=source_meta.query_instruction)
 
-    raw = service.search_by_embedding(embedding, limit=limit)
+    raw = service.search_by_embedding(embedding, limit=limit, source=source)
     results = [SearchResult(**row) for row in raw]
 
     return SearchResponse(

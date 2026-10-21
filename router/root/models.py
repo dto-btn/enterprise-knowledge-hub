@@ -8,6 +8,10 @@ class SearchResult(BaseModel):
     content: str
     chunk_index: int
     similarity: float
+    id: int | None = None
+    source: str | None = None
+    language: str | None = None
+    url: str | None = None
 
 
 class SearchResponse(BaseModel):
