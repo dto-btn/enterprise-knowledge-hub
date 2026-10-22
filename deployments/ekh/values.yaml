@@ -46,6 +46,10 @@ pgvector: #doc: https://artifacthub.io/packages/helm/cloudpirates-postgres/postg
     tag: "pg18"
   persistence:
     size: 250Gi
+  initdb:
+    # ConfigMap holding sql/*.sql, rendered by templates/initdb-configmap.yaml and
+    # mounted by the postgres subchart (same key). Must be non-empty when pgvector.enabled.
+    scriptsConfigMap: "ekh-initdb"
 
 rabbitmq: #doc: https://artifacthub.io/packages/helm/cloudpirates-rabbitmq/rabbitmq
   enabled: true
