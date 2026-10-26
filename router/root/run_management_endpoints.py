@@ -17,6 +17,7 @@ from services.database.run_history_service import RunHistoryService
 from services.knowledge.base import KnowledgeService
 from services.knowledge.tbs_policies.tbs_policies import TBSPoliciesKnowledgeService
 from services.knowledge.wikipedia.wikipedia import WikipediaKnowledgeService
+from services.knowledge.laws.laws import LawsKnowledgeService
 from services.queue.queue_service import QueueService
 
 load_dotenv()
@@ -48,6 +49,14 @@ _REGISTRY: dict[str, tuple[KnowledgeService, RunState]] = {
     ),
     "tbs-policies": (
         TBSPoliciesKnowledgeService(
+            queue_service=_queue_service,
+            logger=logger,
+            run_history_service=_run_history_service,
+        ),
+        RunState(),
+    ),
+    "laws": (
+        LawsKnowledgeService(
             queue_service=_queue_service,
             logger=logger,
             run_history_service=_run_history_service,
