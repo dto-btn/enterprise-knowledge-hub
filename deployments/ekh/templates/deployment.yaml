@@ -123,18 +123,31 @@ spec:
                   key: password
             - name: RABBITMQ_URL
               value: {{ printf "amqp://%s:$(RABBITMQ_PASSWORD)@%s-rabbitmq:%v/" .Values.rabbitmq.auth.username .Release.Name .Values.rabbitmq.port | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.contentStorage.enabled }}
           volumeMounts:
+            {{- if .Values.contentStorage.enabled }}
             - name: content
               mountPath: /app/content
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
-      {{- if .Values.contentStorage.enabled }}
+      {{- if or .Values.contentStorage.enabled .Values.extraVolumes }}
       volumes:
+        {{- if .Values.contentStorage.enabled }}
         - name: content
           persistentVolumeClaim:
             claimName: {{ include "ekh.fullname" . }}-content
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
