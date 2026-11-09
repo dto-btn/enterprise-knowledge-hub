@@ -43,7 +43,7 @@ pgvector: #doc: https://artifacthub.io/packages/helm/cloudpirates-postgres/postg
   auth:
     username: "postgres"
     database: "postgres"
-    password: ""
+    existingSecret: kb-prod-pgvector
   image:
     registry: docker.io
     repository: pgvector/pgvector
