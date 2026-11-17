@@ -1,5 +1,5 @@
 {
-  "name": "Ubuntu",
+  "name": "Developer",
   "image": "mcr.microsoft.com/devcontainers/base:resolute",
   "overrideFeatureInstallOrder": [
     "ghcr.io/gccloudone-aurora-collab/devcontainer-features/enhanced-custom-root-ca"
