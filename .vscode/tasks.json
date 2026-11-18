@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup: Create .env from example",
+      "type": "shell",
+      "command": "cp",
+      "args": ["-n", ".env.example", ".env"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Infrastructure: Start PostgreSQL and RabbitMQ",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "up", "-d", "postgres", "rabbitmq"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Infrastructure: Stop PostgreSQL and RabbitMQ",
+      "type": "shell",
+      "command": "docker",
+      "args": ["compose", "stop", "postgres", "rabbitmq"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
