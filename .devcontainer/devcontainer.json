@@ -5,19 +5,26 @@
     "ghcr.io/gccloudone-aurora-collab/devcontainer-features/enhanced-custom-root-ca"
   ],
   "features": {
-    "ghcr.io/devcontainers-extra/features/prettier:1": {},
-    "ghcr.io/devcontainers-community/npm-features/prettier:1": {},
-    "ghcr.io/devcontainers/features/docker-in-docker:4": {},
-    "ghcr.io/devcontainers-extra/features/uv:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {
+      "moby": true,
+      "azureDnsAutoDetection": true,
+      "installDockerBuildx": true,
+      "iptablesSwitchAtRuntime": true,
+      "version": "latest",
+      "dockerDashComposeVersion": "latest"
+    },
     "ghcr.io/gccloudone-aurora-collab/devcontainer-features/enhanced-custom-root-ca:4": {
       "sources": "https://raw.githubusercontent.com/gccloudone-aurora-collab/goc-root-cert-mirror/main/certs/GoC-GdC-Root-A.crt",
       "fingerprints": "FE:E0:9E:77:43:BF:D4:3E:D7:D4:D3:ED:50:6C:C7:9D:2D:90:70:FF:A9:29:91:16:87:D4:27:33:70:BE:A3:06",
       "allowInsecureDownload": true
     },
-    "ghcr.io/devcontainers-extra/features/pre-commit:2": {}
+    "ghcr.io/devcontainer-community/devcontainer-features/astral.sh-uv:1": {
+      "version": "latest"
+    }
   },
   "containerEnv": {
-    "UV_SYSTEM_CERTS": "true"
+    "UV_SYSTEM_CERTS": "true",
+    "UV_PROJECT_ENVIRONMENT": "/home/vscode/.venv"
   },
   "postCreateCommand": "uv sync --locked",
   "customizations": {
@@ -27,7 +34,7 @@
         "ms-python.vscode-pylance"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+        "python.defaultInterpreterPath": "/home/vscode/.venv/bin/python"
       }
     }
   }
